@@ -994,3 +994,123 @@ select:focus {
   .auth-card { padding: 27px 22px; }
   .account-email { display: none; }
 }
+
+/* Gmail connection status */
+.gmail-connection-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 14px 0 20px;
+  padding: 15px 17px;
+  border: 1px solid #34415a;
+  border-radius: 13px;
+  background: #111a2b;
+}
+.gmail-connection-card.is-connected {
+  border-color: rgba(52, 211, 153, 0.38);
+  background: rgba(16, 185, 129, 0.07);
+}
+.gmail-connection-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #202d43;
+  color: #cbd5e1;
+  font-size: 18px;
+  font-weight: 800;
+}
+.gmail-connection-card.is-connected .gmail-connection-icon {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+}
+.gmail-connection-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.gmail-connection-copy strong {
+  color: #edf4ff;
+  font-size: 13px;
+}
+.gmail-connection-copy span {
+  color: #9aa9bf;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.gmail-connection-badge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.gmail-connection-badge.connected {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+}
+.gmail-connection-badge.not-connected {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+}
+.gmail-connection-error {
+  color: #fca5a5;
+  margin-top: -10px;
+}
+@media (max-width: 560px) {
+  .gmail-connection-card { align-items: flex-start; flex-wrap: wrap; }
+  .gmail-connection-badge { margin-left: 49px; }
+}
+
+/* PDF document import */
+
+.pdf-import-panel {
+  margin-bottom: 22px;
+}
+
+.pdf-file-label {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 16px;
+  padding: 11px 16px;
+  color: #06201e;
+  background: #32d1ba;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pdf-file-label input {
+  display: none;
+}
+
+.pdf-error {
+  margin-top: 12px;
+  color: #ff9aa5;
+  font-size: 12px;
+}
+
+.pdf-extracted {
+  margin-top: 20px;
+}
+
+.pdf-extracted pre {
+  max-height: 300px;
+  overflow: auto;
+  padding: 14px;
+  margin: 12px 0;
+  color: #cbd5e1;
+  background: #0d1526;
+  border: 1px solid #2a3850;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

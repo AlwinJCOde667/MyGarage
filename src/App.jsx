@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "./lib/supabase";
+import { supabase, getGoogleProviderTokenStatus } from "./lib/supabase";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "./App.css";
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 /* ---------- DATA ---------- */
 
 const seedVehicles = [
@@ -55,14 +58,29 @@ function useStored(key, initial) {
 }
 
 function daysLeft(iso) {
-  const [y, m, d] = iso.split("-").map(Number);
+  if (!iso || typeof iso !== "string") return null;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day)
+  ) return null;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
-}
 
+  return Math.round((date - today) / 86400000);
+}
 function formatDate(iso) {
-  if (!iso) return "—";
+  const days = daysLeft(iso);
+  if (days === null) return "Not entered";
+
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -107,6 +125,7 @@ function docName(d) {
 
 function App() {
   const [session, setSession] = useState(null);
+  const [gmailTokenStatus, setGmailTokenStatus] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [cloudLoading, setCloudLoading] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
@@ -136,23 +155,48 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
+    function inspectGoogleProviderTokens(nextSession) {
+      const capturedStatus = getGoogleProviderTokenStatus();
+      if (capturedStatus.checked) {
+        setGmailTokenStatus(capturedStatus);
+        return;
+      }
+      if (!nextSession) return;
+      setGmailTokenStatus({
+        checked: true,
+        hasAccessToken: Boolean(nextSession.provider_token),
+        hasRefreshToken: Boolean(nextSession.provider_refresh_token),
+      });
+    }
+
     supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return;
       if (error) setAuthError(error.message);
-      setSession(data?.session ?? null);
+      const currentSession = data?.session ?? null;
+      setSession(currentSession);
+      inspectGoogleProviderTokens(currentSession);
       setAuthLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!mounted) return;
-      setSession(nextSession);
-      setCloudReady(false);
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+  (_event, nextSession) => {
+    if (!mounted) return;
 
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
-    };
+    setSession(nextSession);
+    inspectGoogleProviderTokens(nextSession);
+
+    // Only reset cloud readiness when the user signs out.
+    if (!nextSession?.user?.id) {
+      setCloudReady(false);
+      setCloudLoading(false);
+    }
+  }
+);
+
+return () => {
+  mounted = false;
+  authListener.subscription.unsubscribe();
+};
   }, []);
 
   // Load this account's cloud data. On the first account login only, migrate
@@ -173,12 +217,15 @@ function App() {
       setAuthError("");
 
       try {
-        const [vehicleResult, documentResult, maintenanceResult] = await Promise.all([
+        const [vehicleResult, documentResult, maintenanceResult, alertStateResult] =
+        await Promise.all([
           supabase.from("vehicles").select("*").eq("user_id", userId),
           supabase.from("documents").select("*").eq("user_id", userId),
           supabase.from("maintenance_records").select("*").eq("user_id", userId),
+          supabase.from("alert_states").select("*").eq("user_id", userId),
         ]);
-
+ 
+        if (alertStateResult.error) throw alertStateResult.error;
         if (vehicleResult.error) throw vehicleResult.error;
         if (documentResult.error) throw documentResult.error;
         if (maintenanceResult.error) throw maintenanceResult.error;
@@ -188,18 +235,46 @@ function App() {
         const cloudMaintenance = maintenanceResult.data ?? [];
         const migrationOwner = localStorage.getItem("mygarage.migratedUserId");
         const canMigrateLocal = !migrationOwner || migrationOwner === userId;
-
+        const cloudAlertStates = alertStateResult.data ?? [];
         const toAppId = (id) => /^\d+$/.test(String(id)) ? Number(id) : id;
+        if (cloudAlertStates.length > 0) {
+          const restoredAlertState = Object.fromEntries(
+  cloudAlertStates.map((row) => [
+    row.id,
+    {
+      read: !!row.is_read,
+      resolved: !!row.is_resolved,
+      resolvedAt: row.resolved_at || null,
+    },
+  ])
+);
+          if (!cancelled) setAlertState(restoredAlertState);
+        } else if (!canMigrateLocal) {
+          if (!cancelled) setAlertState({});
+        } else if (Object.keys(alertState).length > 0) {
+          const rows = Object.entries(alertState).map(([id, state]) => ({
+            user_id: userId,
+            id,
+            is_read: !!state.read,
+            is_resolved: !!state.resolved,
+            resolved_at: state.resolvedAt || null
+            
+          }));
+          const { error } = await supabase.from("alert_states").insert(rows);
+          if (error) throw error;
+        }
 
         if (cloudVehicles.length > 0) {
           if (!cancelled) {
-            setVehicles(cloudVehicles.map((row) => ({
-              id: toAppId(row.id),
-              name: row.name ?? "",
-              variant: row.details?.variant ?? "",
-              type: row.details?.type ?? "Other",
-              km: row.details?.km ?? "",
-            })));
+           setVehicles(cloudVehicles.map((row) => ({
+  id: toAppId(row.id),
+  name: row.name ?? "",
+  variant: row.details?.variant ?? "",
+  type: row.details?.type ?? "Other",
+  km: row.details?.km ?? "",
+  registrationNumber:
+    row.details?.registrationNumber ?? row.registration_number ?? "",
+})));
           }
         } else if (canMigrateLocal && vehicles.length > 0) {
           const rows = vehicles.map((vehicle) => ({
@@ -207,10 +282,11 @@ function App() {
             user_id: userId,
             name: vehicle.name,
             details: {
-              variant: vehicle.variant ?? "",
-              type: vehicle.type ?? "Other",
-              km: vehicle.km ?? "",
-            },
+  variant: vehicle.variant ?? "",
+  type: vehicle.type ?? "Other",
+  km: vehicle.km ?? "",
+  registrationNumber: vehicle.registrationNumber ?? "",
+},
           }));
           const { error } = await supabase.from("vehicles").insert(rows);
           if (error) throw error;
@@ -221,14 +297,19 @@ function App() {
         if (cloudDocuments.length > 0) {
           if (!cancelled) {
             setDocuments(cloudDocuments.map((row) => ({
-              id: toAppId(row.id),
-              vehicleId: toAppId(row.vehicle_id),
-              type: row.type,
-              label: row.label ?? "",
-              number: row.number ?? "",
-              issue: row.issue ?? "",
-              expiry: row.expiry ?? "",
-            })));
+  id: toAppId(row.id),
+  vehicleId: toAppId(row.vehicle_id),
+  type: row.type,
+  label: row.label ?? "",
+  number: row.number ?? "",
+  issue: row.issue ?? "",
+  expiry: row.expiry ?? "",
+  filePath: row.file_path ?? "",
+  fileName: row.file_name ?? "",
+  fileMimeType: row.file_mime_type ?? "",
+  fileSize: row.file_size ?? null,
+  source: row.source ?? "manual",
+})));
           }
         } else if (canMigrateLocal && documents.length > 0) {
           const rows = documents.map((document) => ({
@@ -258,6 +339,7 @@ function App() {
               cost: row.cost ?? "",
               nextDate: row.next_date ?? "",
               nextOdometer: row.next_odometer ?? "",
+              nextServiceCompleted: !!row.next_service_completed,
               description: row.description ?? "",
             })));
           }
@@ -272,6 +354,7 @@ function App() {
             cost: record.cost === "" ? null : record.cost,
             next_date: record.nextDate || null,
             next_odometer: record.nextOdometer === "" ? null : record.nextOdometer,
+            next_service_completed: !!record.nextServiceCompleted,
             description: record.description || null,
           }));
           const { error } = await supabase.from("maintenance_records").insert(rows);
@@ -311,27 +394,32 @@ function App() {
     const userId = session.user.id;
 
     const vehicleRows = vehicles.map((vehicle) => ({
-      id: String(vehicle.id),
-      user_id: userId,
-      name: vehicle.name,
-      details: {
-        variant: vehicle.variant ?? "",
-        type: vehicle.type ?? "Other",
-        km: vehicle.km ?? "",
-      },
-    }));
+  id: String(vehicle.id),
+  user_id: userId,
+  name: vehicle.name,
+  details: {
+    variant: vehicle.variant ?? "",
+    type: vehicle.type ?? "Other",
+    km: vehicle.km ?? "",
+    registrationNumber: vehicle.registrationNumber ?? "",
+  },
+}));
 
-    const documentRows = documents.map((document) => ({
-      id: String(document.id),
-      user_id: userId,
-      vehicle_id: String(document.vehicleId),
-      type: document.type,
-      label: document.label || null,
-      number: document.number || null,
-      issue: document.issue || null,
-      expiry: document.expiry || null,
-    }));
-
+   const documentRows = documents.map((document) => ({
+  id: String(document.id),
+  user_id: userId,
+  vehicle_id: String(document.vehicleId),
+  type: document.type,
+  label: document.label || null,
+  number: document.number || null,
+  issue: document.issue || null,
+  expiry: document.expiry || null,
+  file_path: document.filePath || null,
+  file_name: document.fileName || null,
+  file_mime_type: document.fileMimeType || null,
+  file_size: document.fileSize || null,
+  source: document.source || "manual",
+}));
     const maintenanceRows = maintenance.map((record) => ({
       id: String(record.id),
       user_id: userId,
@@ -342,7 +430,17 @@ function App() {
       cost: record.cost === "" ? null : record.cost,
       next_date: record.nextDate || null,
       next_odometer: record.nextOdometer === "" ? null : record.nextOdometer,
+      next_service_completed: !!record.nextServiceCompleted,
       description: record.description || null,
+    }));
+
+
+    const alertStateRows = Object.entries(alertState).map(([id, state]) => ({
+      user_id: userId,
+      id,
+      is_read: !!state.read,
+      is_resolved: !!state.resolved,
+      resolved_at: state.resolvedAt || null,
     }));
 
     async function syncTable(table, rows) {
@@ -365,19 +463,23 @@ function App() {
         await syncTable("vehicles", vehicleRows);
         await syncTable("documents", documentRows);
         await syncTable("maintenance_records", maintenanceRows);
+        if (alertStateRows.length > 0) {
+          const { error } = await supabase
+          .from("alert_states")
+          .upsert(alertStateRows, { onConflict: "user_id,id" });
+          if (error) throw error;
+        }
       })
       .catch((error) => {
         console.error("MyGarage cloud sync failed:", error);
         setAuthError(`Cloud sync issue: ${error.message || "Please check your connection and refresh."}`);
       });
-  }, [cloudReady, session?.user?.id, vehicles, documents, maintenance]);
-
-  async function handleAuthSubmit(event) {
-    event.preventDefault();
-    setAuthBusy(true);
-    setAuthError("");
-    setAuthMessage("");
-
+    }, [cloudReady, session?.user?.id, vehicles, documents, maintenance, alertState]);
+    async function handleAuthSubmit(event) {
+      event.preventDefault();
+      setAuthBusy(true);
+      setAuthError("");
+      setAuthMessage("");
     try {
       if (authMode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -411,42 +513,223 @@ function App() {
 
   const vehicleName = (id) => vehicles.find((v) => v.id === id)?.name ?? "Unknown vehicle";
 
+  
   const enriched = documents.map((d) => {
     const days = daysLeft(d.expiry);
-    const stage = alertStage(days, settings.intervals);
+    const stage = days === null ? null : alertStage(days, settings.intervals);
     const key = `${d.id}:${stage}`;
     const st = alertState[key] || {};
-    return { ...d, days, info: alertInfo(days), stage, key, read: !!st.read, resolved: !!st.resolved };
-  });
-  const alerts = enriched
-    .filter((d) => d.stage !== null && !d.resolved)
-    .sort((a, b) => a.days - b.days);
-  const unread = alerts.filter((a) => !a.read);
-  const activeDocs = enriched.filter((d) => d.days >= 0).length;
 
-  function setFlag(key, patch) {
-    setAlertState((s) => ({ ...s, [key]: { ...s[key], ...patch } }));
-  }
+    return {
+      ...d,
+      days,
+      info: days === null
+        ? { alert: false, cls: "warning", label: "Expiry date not entered" }
+        : alertInfo(days),
+      stage,
+      key,
+      kind: "document",
+      read: !!st.read,
+      resolved: !!st.resolved,
+      resolvedAt: st.resolvedAt || null,
+    };
+  });
+
+  const serviceAlerts = maintenance.flatMap((record) => {
+    const key = `service:${record.id}:${record.nextDate || ""}:${record.nextOdometer || ""}`;
+const st = alertState[key] || {};
+
+if (record.nextServiceCompleted && !st.resolved) return [];
+    const vehicle = vehicles.find(
+      (v) => String(v.id) === String(record.vehicleId)
+    );
+
+
+    if (!vehicle) return [];
+
+    const days = record.nextDate ? daysLeft(record.nextDate) : null;
+
+    const dateDue = days !== null && days <= 30;
+
+    const kmDue =
+      record.nextOdometer !== "" &&
+      record.nextOdometer != null &&
+      vehicle.km !== "" &&
+      vehicle.km != null &&
+      Number.isFinite(Number(record.nextOdometer)) &&
+      Number.isFinite(Number(vehicle.km)) &&
+      Number(vehicle.km) >= Number(record.nextOdometer);
+
+
+if (!dateDue && !kmDue && !st.resolved) return [];
+
+    let info;
+
+    if (dateDue && kmDue) {
+      info = {
+        alert: true,
+        cls: "danger",
+        label: "Date and kilometre target reached",
+      };
+    } else if (kmDue) {
+      info = {
+        alert: true,
+        cls: "orange",
+        label: "Service kilometre target reached",
+      };
+    } else {
+      info = alertInfo(days);
+    }
+
+    return [{
+      ...record,
+      key,
+      kind: "service",
+      days,
+     stage: kmDue
+  ? "odometer"
+  : (alertStage(days, [30, 15, 7, 3, 1]) || (st.resolved ? "resolved" : null)),
+      info,
+      label: record.type || "Service",
+      type: record.type || "Maintenance",
+      vehicleId: record.vehicleId,
+      vehicleName: vehicle.name,
+      date: record.nextDate || "",
+      kmDue,
+      dateDue,
+      read: !!st.read,
+      resolved: !!st.resolved,
+      resolvedAt: st.resolvedAt || null,
+    }];
+  });
+
+  // Recover resolved service alerts whose reminder key refers to an older
+  // next-service date or odometer target. These keys remain in alertState even
+  // after the maintenance record is edited, so rebuild them for history only.
+  const historicalResolvedServiceAlerts = Object.entries(alertState).flatMap(
+    ([key, state]) => {
+      if (!key.startsWith("service:")) return [];
+      if (serviceAlerts.some((alert) => alert.key === key)) return [];
+
+      const match = /^service:(\d+):([^:]*):([^:]*)$/.exec(key);
+      if (!match) return [];
+
+      const [, recordId, historicalDate, historicalOdometer] = match;
+      const record = maintenance.find((item) => String(item.id) === recordId);
+      if (!record) return [];
+
+      const vehicle = vehicles.find(
+        (item) => String(item.id) === String(record.vehicleId)
+      );
+      if (!vehicle) return [];
+
+      const days = historicalDate ? daysLeft(historicalDate) : null;
+      const targetOdometer = historicalOdometer === ""
+        ? null
+        : Number(historicalOdometer);
+      const kmDue =
+        targetOdometer !== null &&
+        Number.isFinite(targetOdometer) &&
+        vehicle.km !== "" &&
+        vehicle.km != null &&
+        Number.isFinite(Number(vehicle.km)) &&
+        Number(vehicle.km) >= targetOdometer;
+      const dateDue = days !== null && days <= 30;
+
+      return [{
+        ...record,
+        key,
+        kind: "service",
+        stage: kmDue
+          ? "odometer"
+          : (days === null
+              ? (state.resolved ? "resolved" : "historical")
+              : (alertStage(days, [30, 15, 7, 3, 1]) || (state.resolved ? "resolved" : "historical"))),
+        days,
+        info: !state.resolved
+          ? { alert: true, cls: "warning", label: "Restored historical reminder" }
+          : (days === null
+              ? { alert: true, cls: "warning", label: "Historical service reminder" }
+              : alertInfo(days)),
+        label: `Historical ${record.type || "Service"}`,
+        type: record.type || "Maintenance",
+        vehicleId: record.vehicleId,
+        vehicleName: vehicle.name,
+        date: historicalDate || "",
+        nextOdometer: targetOdometer,
+        targetOdometer,
+        kmDue,
+        dateDue,
+        read: !!state.read,
+        resolved: !!state.resolved,
+        resolvedAt: state.resolvedAt || null,
+      }];
+    }
+  );
+
+  const allAlerts = [
+    ...enriched.filter((d) => d.stage !== null),
+    ...serviceAlerts,
+    ...historicalResolvedServiceAlerts,
+  ];
+
+  const alerts = allAlerts
+  .filter((a) => !a.resolved)
+  .sort((a, b) => {
+    if (a.days === null) return 1;
+    if (b.days === null) return -1;
+    return a.days - b.days;
+  });
+
+  const unread = alerts.filter((a) => !a.read);
+
+  const activeDocs = enriched.filter(
+    (d) => d.days !== null && d.days >= 0
+  ).length;
+
+ function setFlag(key, patch) {
+  setAlertState((s) => ({
+    ...s,
+    [key]: {
+      ...s[key],
+      ...patch,
+      ...(patch.resolved === true
+        ? { resolvedAt: new Date().toISOString() }
+        : patch.resolved === false
+          ? { resolvedAt: null }
+          : {}),
+    },
+  }));
+}
 
   function markAllRead() {
     setAlertState((s) => {
       const next = { ...s };
-      alerts.forEach((a) => (next[a.key] = { ...next[a.key], read: true }));
+      alerts.forEach((a) => {
+        next[a.key] = { ...next[a.key], read: true };
+      });
       return next;
     });
   }
 
-  // Fire a pop-up (and browser notification) once per new alert
+  // Notify once when a new document or service alert appears.
   const alertKeys = alerts.map((a) => a.key).join("|");
+
   useEffect(() => {
     const fresh = alerts.filter((a) => !notified.includes(a.key));
     if (!fresh.length) return;
+
     const items = fresh.slice(0, 3).map((a) => ({
       id: a.key,
-      title: `${docName(a)} · ${vehicleName(a.vehicleId)}`,
-      body: `${a.info.label} (expiry ${formatDate(a.expiry)})`,
+      title: a.kind === "service"
+        ? `${a.label} · ${a.vehicleName}`
+        : `${docName(a)} · ${vehicleName(a.vehicleId)}`,
+      body: a.kind === "service"
+        ? `${a.info.label}${a.date ? ` · Due ${formatDate(a.date)}` : ""}${a.kmDue ? " · Kilometre target reached" : ""}`
+        : `${a.info.label} (expiry ${formatDate(a.expiry)})`,
       cls: a.info.cls,
     }));
+
     if (fresh.length > 3) {
       items.push({
         id: `more-${Date.now()}`,
@@ -455,24 +738,42 @@ function App() {
         cls: "info",
       });
     }
+
     setToasts((t) => [...t, ...items]);
-    if (settings.browser && "Notification" in window && Notification.permission === "granted") {
-      items.forEach((i) => {
+
+    if (
+      settings.browser &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      items.forEach((item) => {
         try {
-          new Notification(i.title, { body: i.body });
+          new Notification(item.title, { body: item.body });
         } catch {
-          /* ignore */
+          // Ignore notification errors.
         }
       });
     }
+
     setNotified((n) => [...n, ...fresh.map((a) => a.key)]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertKeys]);
 
   function docStatus(vehicleId, type) {
-    const list = enriched.filter((d) => d.vehicleId === vehicleId && d.type === type);
+    const list = enriched.filter(
+      (d) => String(d.vehicleId) === String(vehicleId) && d.type === type
+    );
+
     if (!list.length) return { cls: "warning", label: "Not entered" };
-    const latest = list.sort((a, b) => b.days - a.days)[0];
+
+    const validDates = list.filter((d) => d.days !== null);
+
+    if (!validDates.length) {
+      return { cls: "warning", label: "Expiry date not entered" };
+    }
+
+    const latest = [...validDates].sort((a, b) => b.days - a.days)[0];
     return latest.info;
   }
 
@@ -594,7 +895,7 @@ function App() {
                         }}
                       >
                         <strong>
-                          {docName(a)} · {vehicleName(a.vehicleId)}
+                          {a.kind === "service" ? a.label : docName(a)} · {a.vehicleName || vehicleName(a.vehicleId)}
                         </strong>
                         <span>{a.info.label}</span>
                       </div>
@@ -625,9 +926,14 @@ function App() {
               <p>Everything about your vehicles, all in one place.</p>
             </div>
 
-            <button className="primary-button" onClick={() => setActive("My Vehicles")}>
-              + Add vehicle
-            </button>
+           {active === "Dashboard" && (
+  <button
+    className="primary-button"
+    onClick={() => setActive("My Vehicles")}
+  >
+    + Add vehicle
+  </button>
+)}
           </section>
 
           {active === "Dashboard" && (
@@ -657,6 +963,7 @@ function App() {
               enriched={enriched}
               setDocuments={setDocuments}
               vehicleName={vehicleName}
+              gmailTokenStatus={gmailTokenStatus}
             />
           )}
 
@@ -671,7 +978,7 @@ function App() {
 
           {active === "Alerts" && (
             <AlertsPage
-              enriched={enriched}
+              allAlerts={allAlerts}
               vehicleName={vehicleName}
               setFlag={setFlag}
               markAllRead={markAllRead}
@@ -838,6 +1145,7 @@ function Dashboard({ vehicles, docStatus, activeDocs, alerts, maintenance, vehic
         <Stat
           label="Upcoming services"
           value={String(maintenance.filter((record) => {
+            if (record.nextServiceCompleted) return false;
             const vehicle = vehicles.find((item) => item.id === record.vehicleId);
             const dateDue = record.nextDate && daysLeft(record.nextDate) <= 30;
             const kmDue =
@@ -882,9 +1190,15 @@ function Dashboard({ vehicles, docStatus, activeDocs, alerts, maintenance, vehic
                 </div>
 
                 <h3>{v.name}</h3>
-                <p className="variant">{v.variant}</p>
+<p className="variant">{v.variant}</p>
 
-                <div className="registration">VEHICLE PROFILE</div>
+{v.registrationNumber && (
+  <div className="registration">
+    {v.registrationNumber}
+  </div>
+)}
+
+<div className="vehicle-divider" />
                 <div className="vehicle-divider" />
 
                 <div className="vehicle-details">
@@ -963,16 +1277,31 @@ function Dashboard({ vehicles, docStatus, activeDocs, alerts, maintenance, vehic
 
 /* ---------- VEHICLES ---------- */
 
-const emptyVehicle = { name: "", variant: "", type: "Car", km: "" };
-
+const emptyVehicle = {
+  name: "",
+  variant: "",
+  type: "Car",
+  km: "",
+  registrationNumber: "",
+};
 function Vehicles({ vehicles, setVehicles, documents, setDocuments }) {
   const [form, setForm] = useState(null); // null = closed
   const [editingId, setEditingId] = useState(null);
 
   function open(v) {
-    setEditingId(v ? v.id : null);
-    setForm(v ? { name: v.name, variant: v.variant, type: v.type, km: v.km } : emptyVehicle);
-  }
+  setEditingId(v ? v.id : null);
+  setForm(
+    v
+      ? {
+          name: v.name,
+          variant: v.variant,
+          type: v.type,
+          km: v.km,
+          registrationNumber: v.registrationNumber || "",
+        }
+      : { ...emptyVehicle }
+  );
+}
 
   function save(e) {
     e.preventDefault();
@@ -998,6 +1327,7 @@ function Vehicles({ vehicles, setVehicles, documents, setDocuments }) {
 
   return (
     <>
+    
       <div className="toolbar">
         <p className="panel-subtitle">{vehicles.length} vehicle(s) in your garage</p>
         <button className="primary-button" onClick={() => open(null)}>
@@ -1026,6 +1356,19 @@ function Vehicles({ vehicles, setVehicles, documents, setDocuments }) {
                 placeholder="e.g. 2018 · VX · Petrol"
               />
             </label>
+            <label>
+  Registration Number
+  <input
+    value={form.registrationNumber}
+    onChange={(e) =>
+      setForm({
+        ...form,
+        registrationNumber: e.target.value.toUpperCase(),
+      })
+    }
+    placeholder="e.g. KL 45 T 2358"
+  />
+</label>
             <label>
               Type
               <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
@@ -1064,6 +1407,9 @@ function Vehicles({ vehicles, setVehicles, documents, setDocuments }) {
             </div>
             <h3>{v.name}</h3>
             <p className="variant">{v.variant || "—"}</p>
+            <p className="variant">
+  {v.registrationNumber || "Registration not entered"}
+</p>
             <div className="vehicle-divider" />
             <div className="vehicle-details">
               <span>Odometer</span>
@@ -1102,11 +1448,15 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
     cost: "",
     nextDate: "",
     nextOdometer: "",
+    nextServiceCompleted: false,
   };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState("all");
+  
+
+
 
   function openAdd() {
     setEditingId(null);
@@ -1167,17 +1517,61 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
     }
   }
 
+  function markCompleted(record) {
+  if (!window.confirm(
+    `Mark the next service for ${vehicleName(record.vehicleId)} as completed?`
+  )) {
+    return;
+  }
+
+  setRecords((items) =>
+    items.map((item) =>
+      item.id === record.id
+        ? { ...item, nextServiceCompleted: true }
+        : item
+    )
+  );
+}
+
+function undoCompleted(record) {
+  setRecords((items) =>
+    items.map((item) =>
+      item.id === record.id
+        ? { ...item, nextServiceCompleted: false }
+        : item
+    )
+  );
+}
+
   const shown = records
-    .filter((record) => filter === "all" || record.vehicleId === Number(filter))
-    .sort((a, b) => b.date.localeCompare(a.date));
+  .filter((record) => filter === "all" || String(record.vehicleId) === String(filter))
+  .sort((a, b) => b.date.localeCompare(a.date));
+  
+  const upcomingRecords = shown.filter(
+    (record) =>
+      !record.nextServiceCompleted &&
+    (record.nextDate || record.nextOdometer !== "")
+  );
+  
+  const completedRecords = shown.filter(
+    (record) => record.nextServiceCompleted
+  );
   const totalCost = shown.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
   const dueRecords = shown.filter((item) => {
-    const vehicle = vehicles.find((v) => v.id === item.vehicleId);
-    const dateDue = item.nextDate && daysLeft(item.nextDate) <= 30;
-    const kmDue = item.nextOdometer !== "" && vehicle?.km !== "" && vehicle?.km != null && Number(vehicle.km) >= Number(item.nextOdometer);
+    if (item.nextServiceCompleted) return false;
+    const vehicle = vehicles.find(
+      (v) => String(v.id) === String(item.vehicleId)
+    );
+    
+    const dateDays = item.nextDate ? daysLeft(item.nextDate) : null;
+    const dateDue = dateDays !== null && dateDays <= 30;
+    const kmDue =
+    item.nextOdometer !== "" &&
+    vehicle?.km !== "" &&
+    vehicle?.km != null &&
+    Number(vehicle.km) >= Number(item.nextOdometer);
     return dateDue || kmDue;
   });
-
   return (
     <>
       <div className="maintenance-summary">
@@ -1193,6 +1587,7 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
         </select>
         <button className="primary-button" onClick={openAdd} disabled={!vehicles.length}>+ Add service record</button>
       </div>
+      
 
       {showForm && (
         <form className="panel form-panel" onSubmit={save}>
@@ -1251,6 +1646,11 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
                 <div className="maintenance-card-top">
                   <div><strong>{record.type}</strong><span>{vehicleName(record.vehicleId)} · {formatDate(record.date)}</span></div>
                   <div className="maintenance-card-actions">
+                    {record.nextServiceCompleted ? (
+                      <button className="ghost-button small" onClick={() => undoCompleted(record)}>Undo completion</button>
+                    ) : (
+                    <button className="primary-button small" onClick={() => markCompleted(record)} disabled={!record.nextDate && record.nextOdometer === ""}>Mark as Completed</button>
+                    )}
                     <button className="ghost-button small" onClick={() => openEdit(record)}>Edit</button>
                     <button className="icon-button" onClick={() => remove(record.id)} title="Delete service record">🗑</button>
                   </div>
@@ -1262,7 +1662,7 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
                   <span>Next odometer: <b>{record.nextOdometer !== "" ? `${Number(record.nextOdometer).toLocaleString("en-IN")} km` : "Not entered"}</b></span>
                 </div>
                 {record.description && <p className="maintenance-notes">{record.description}</p>}
-                {(dateDue || kmDue) && <div className="maintenance-due">{dateDays !== null && dateDays < 0 ? `Service date overdue by ${Math.abs(dateDays)} days` : dateDue ? `Next service date ${dateDays === 0 ? "is today" : `in ${dateDays} days`}` : "Odometer service threshold reached"}</div>}
+                {(dateDue || kmDue) && !record.nextServiceCompleted && <div className="maintenance-due">{dateDays !== null && dateDays < 0 ? `Service date overdue by ${Math.abs(dateDays)} days` : dateDue ? `Next service date ${dateDays === 0 ? "is today" : `in ${dateDays} days`}` : "Odometer service threshold reached"}</div>}
               </article>
             );
           })}
@@ -1274,12 +1674,444 @@ function Maintenance({ vehicles, records, setRecords, vehicleName }) {
 
 /* ---------- DOCUMENTS ---------- */
 
-function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
+function Documents({ vehicles, enriched, setDocuments, vehicleName, gmailTokenStatus }) {
+  const [gmailConnecting, setGmailConnecting] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailStatusLoading, setGmailStatusLoading] = useState(true);
+  const [gmailAccountEmail, setGmailAccountEmail] = useState("");
+  const [gmailMessage, setGmailMessage] = useState("");
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [versionHistory, setVersionHistory] = useState([]);
+  const [historyDocument, setHistoryDocument] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+
+
+
+async function loadVersionHistory(doc) {
+  if (!currentUserId) {
+    window.alert("Please sign in to view document history.");
+    return;
+  }
+
+  setHistoryDocument(doc);
+  setHistoryLoading(true);
+  setVersionHistory([]);
+
+  try {
+    const { data, error } = await supabase
+      .from("document_versions")
+      .select("*")
+      .eq("user_id", currentUserId)
+      .eq("document_id", String(doc.id))
+      .order("recorded_at", { ascending: false });
+
+    if (error) throw error;
+
+    setVersionHistory(data || []);
+  } catch (error) {
+    console.error("Version history loading failed:", error);
+    window.alert("Could not load version history: " + error.message);
+    setHistoryDocument(null);
+  } finally {
+    setHistoryLoading(false);
+  }
+}
+
+  async function viewDocument(doc) {
+  if (!doc.filePath) {
+    window.alert("No PDF is attached to this document.");
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("vehicle-documents")
+      .createSignedUrl(doc.filePath, 300);
+
+    if (error) throw error;
+
+    const pdfWindow = window.open("about:blank", "_blank");
+
+if (pdfWindow) {
+  pdfWindow.opener = null;
+  pdfWindow.location.href = data.signedUrl;
+}
+  } catch (error) {
+    console.error("Could not open document:", error);
+    window.alert("Could not open the PDF: " + error.message);
+  }
+}
+
+  useEffect(() => {
+  let active = true;
+
+  async function loadUser() {
+    const { data, error } = await supabase.auth.getUser();
+
+    if (!error && active) {
+      setCurrentUserId(data.user?.id ?? null);
+    }
+  }
+
+  loadUser();
+
+  return () => {
+    active = false;
+  };
+}, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkGmailConnection() {
+      try {
+        const { data, error } = await supabase.auth.getUserIdentities();
+        if (!mounted) return;
+
+        if (error) throw error;
+
+        const googleIdentity = (data?.identities ?? []).find(
+          (identity) => identity.provider === "google"
+        );
+        setGmailConnected(Boolean(googleIdentity));
+        setGmailAccountEmail(googleIdentity?.identity_data?.email || "");
+        setGmailMessage("");
+      } catch (error) {
+        if (mounted) setGmailMessage(error.message || "Could not check Gmail connection.");
+      } finally {
+        if (mounted) setGmailStatusLoading(false);
+      }
+    }
+
+    checkGmailConnection();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function startGoogleLink() {
+    const { error } = await supabase.auth.linkIdentity({
+      provider: "google",
+      options: {
+        scopes: "https://www.googleapis.com/auth/gmail.readonly",
+        redirectTo: window.location.origin,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    if (error) throw error;
+  }
+
+  async function connectGmail() {
+    setGmailConnecting(true);
+    setGmailMessage("");
+
+    try {
+      await startGoogleLink();
+    } catch (error) {
+      setGmailMessage(error.message || "Could not start Gmail connection.");
+      setGmailConnecting(false);
+    }
+  }
+
+  async function reconnectGmail() {
+    const confirmed = window.confirm(
+      "Reconnect Gmail? This will unlink the current Google identity from MyGarage and immediately start linking it again. Your email/password sign-in will remain connected."
+    );
+    if (!confirmed) return;
+
+    setGmailConnecting(true);
+    setGmailMessage("");
+
+    try {
+      const { data, error: identitiesError } = await supabase.auth.getUserIdentities();
+      if (identitiesError) throw identitiesError;
+
+      const identities = data?.identities ?? [];
+      const googleIdentity = identities.find(
+        (identity) => identity.provider === "google"
+      );
+
+      if (googleIdentity) {
+        if (identities.length < 2) {
+          throw new Error(
+            "Google cannot be safely unlinked because this account does not have another sign-in identity."
+          );
+        }
+
+        const { error: unlinkError } = await supabase.auth.unlinkIdentity(googleIdentity);
+        if (unlinkError) throw unlinkError;
+      }
+
+      await startGoogleLink();
+    } catch (error) {
+      setGmailMessage(
+        error.message || "Could not reconnect Gmail. Your email/password sign-in remains available."
+      );
+      setGmailConnecting(false);
+    }
+  }
+
   const blank = { vehicleId: vehicles[0]?.id ?? "", type: "Insurance", label: "", number: "", issue: "", expiry: "" };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState("all");
+  useEffect(() => {
+  if (showForm) {
+    window.document
+      .getElementById("document-editor")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}, [showForm]);
+  const [pdfBusy, setPdfBusy] = useState(false);
+const [pdfText, setPdfText] = useState("");
+const [pdfFile, setPdfFile] = useState(null);
+const [pdfError, setPdfError] = useState("");
+const [pdfDetectedRegistration, setPdfDetectedRegistration] = useState("");
+
+
+async function handlePdfSelect(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+
+  if (!file) return;
+
+  setPdfError("");
+  setPdfText("");
+  setPdfFile(null);
+  setPdfDetectedRegistration("");
+
+  if (file.type !== "application/pdf") {
+    setPdfError("Please select a PDF file.");
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    setPdfError("PDF must be smaller than 10 MB.");
+    return;
+  }
+
+  setPdfBusy(true);
+
+  try {
+    const buffer = await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+    }).promise;
+
+    const pages = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+
+      pages.push(
+        content.items.map((item) => item.str || "").join(" ")
+      );
+    }
+
+    const extractedText = pages.join("\n\n");
+
+    if (!extractedText.trim()) {
+      throw new Error("No selectable text found. This PDF may be scanned.");
+    }
+
+    // Detect document information
+    const detected = detectDocumentDetails(extractedText, file.name);
+const { registration, matchStatus, ...documentFields } = detected;
+
+if (!documentFields.vehicleId) {
+  setPdfDetectedRegistration(registration);
+  setPdfFile(file);
+  setPdfText(extractedText.slice(0, 30000));
+  setPdfError(
+    matchStatus === "registration-not-found"
+      ? "The registration number was found, but it does not match any saved vehicle. Please select the correct vehicle manually."
+      : "Could not confidently identify the vehicle. Please select it manually."
+  );
+  return;
+}
+    // Update the PDF preview and document form
+    setPdfFile(file);
+    setPdfText(extractedText.slice(0, 30000));
+    setPdfDetectedRegistration(registration);
+   const matchingDocuments = enriched.filter(
+  (doc) =>
+    String(doc.vehicleId) === String(documentFields.vehicleId) &&
+    doc.type === documentFields.type
+);
+
+const existingDocument = matchingDocuments.sort(
+  (a, b) => new Date(b.expiry || 0) - new Date(a.expiry || 0)
+)[0];
+
+setForm({
+  ...blank,
+  ...documentFields,
+  label: existingDocument?.label || documentFields.label || "",
+});
+
+setEditingId(existingDocument?.id ?? null);
+setShowForm(true);
+
+  } catch (error) {
+    console.error("PDF processing error:", error);
+    setPdfError(error.message || "Could not read this PDF.");
+  } finally {
+    setPdfBusy(false);
+  }
+}
+
+
+
+
+function detectDocumentDetails(text, fileName = "") {
+  const content = `${fileName} ${text}`.replace(/\s+/g, " ");
+  const upper = content.toUpperCase();
+
+  const normalizeRegistration = (value) =>
+    String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+  const getDate = (value) => {
+    if (!value) return "";
+
+    const match = value.match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
+
+    return match
+      ? `${match[3]}-${match[2]}-${match[1]}`
+      : "";
+  };
+
+  // Insurance details
+  const policyNumber =
+    content.match(
+      /Policy\s*(?:No\.?|Number)\s*[:.]?\s*([A-Z0-9/-]+)/i
+    )?.[1] || "";
+
+  const insurancePeriod = content.match(
+    /Period of Insurance[\s\S]{0,120}?From[\s\S]{0,40}?(\d{2}[/-]\d{2}[/-]\d{4})[\s\S]{0,120}?To[\s\S]{0,40}?(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
+
+  const insuranceIssue =
+    content.match(
+      /Date of Issue\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+    ) ||
+    content.match(
+      /Receipt Date\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+    );
+
+  const insuranceExpiry = content.match(
+    /(?:Insurance expiry Date|expiry date|valid upto|valid up to)\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
+
+  // Kerala PUC certificate details
+  const pucCertificateNumber =
+    content.match(
+      /Certificate\s*SL\.?\s*No\.?\s*[:.]?\s*([A-Z0-9/-]+)/i
+    )?.[1] || "";
+
+  const pucIssue = content.match(
+    /\bDate\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
+
+  const pucExpiry = content.match(
+    /Validity\s*upto\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
+
+  // Detect document type
+  let type = "Other";
+
+  if (/\bPUC\b|pollution under control/i.test(content)) {
+    type = "PUC";
+  } else if (/insurance|policy number|premium/i.test(content)) {
+    type = "Insurance";
+  } else if (/registration certificate|\bRC\b/i.test(content)) {
+    type = "RC";
+  }
+
+  // Support compact and spaced registration formats:
+  // KL45T2358, KL 45 T 2358, KL-45-T-2358
+  const registrationMatch = content.match(
+    /\b[A-Z]{2}[\s-]*\d{1,2}[\s-]*[A-Z]{1,3}[\s-]*\d{1,4}\b/i
+  );
+
+  const registration = registrationMatch?.[0] || "";
+  const normalizedRegistration = normalizeRegistration(registration);
+
+  // Match against saved vehicle registration numbers
+  const registrationMatches = normalizedRegistration
+    ? vehicles.filter(
+        (v) =>
+          normalizeRegistration(v.registrationNumber || v.registration) ===
+          normalizedRegistration
+      )
+    : [];
+
+  // Secondary vehicle-name detection
+  const vehicleHints = [
+    {
+      words: ["THUNDERBIRD", "ROYAL ENFIELD"],
+      name: "Thunderbird",
+    },
+    { words: ["ACTIVA"], name: "Activa" },
+    { words: ["DIO"], name: "Dio" },
+    { words: ["A-STAR", "A STAR"], name: "A-Star" },
+    { words: ["AMAZE"], name: "Amaze" },
+  ];
+
+  const detectedVehicle = vehicleHints.find((item) =>
+    item.words.some((word) => upper.includes(word))
+  );
+
+  const nameMatches = detectedVehicle
+    ? vehicles.filter((v) =>
+        v.name?.toUpperCase().includes(detectedVehicle.name.toUpperCase())
+      )
+    : [];
+
+  let vehicle = null;
+  let matchStatus = "unmatched";
+
+  if (registrationMatches.length === 1) {
+    vehicle = registrationMatches[0];
+    matchStatus = "registration";
+  } else if (
+    !normalizedRegistration &&
+    nameMatches.length === 1
+  ) {
+    vehicle = nameMatches[0];
+    matchStatus = "name";
+  } else if (normalizedRegistration && registrationMatches.length === 0) {
+    matchStatus = "registration-not-found";
+  } else if (registrationMatches.length > 1 || nameMatches.length > 1) {
+    matchStatus = "ambiguous";
+  }
+
+  return {
+    type,
+    number:
+      type === "PUC" ? pucCertificateNumber : policyNumber,
+    issue:
+      type === "PUC"
+        ? getDate(pucIssue?.[1])
+        : getDate(insurancePeriod?.[1]) || getDate(insuranceIssue?.[1]),
+    expiry:
+      type === "PUC"
+        ? getDate(pucExpiry?.[1])
+        : getDate(insurancePeriod?.[2]) || getDate(insuranceExpiry?.[1]),
+    vehicleId: vehicle ? String(vehicle.id) : "",
+    registration,
+    matchStatus,
+  };
+}
+
+
 
   function openAddForm() {
     setEditingId(null);
@@ -1288,36 +2120,161 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
   }
 
   function openEditForm(document) {
-    setEditingId(document.id);
-    setForm({
-      vehicleId: document.vehicleId,
-      type: document.type,
-      label: document.label || "",
-      number: document.number || "",
-      issue: document.issue || "",
-      expiry: document.expiry || "",
-    });
-    setShowForm(true);
+  setEditingId(document.id);
+
+  setForm({
+    vehicleId: document.vehicleId,
+    type: document.type,
+    label: document.label || "",
+    number: document.number || "",
+    issue: document.issue || "",
+    expiry: document.expiry || "",
+  });
+
+  setShowForm(true);
+}
+
+ async function save(e) {
+  e.preventDefault();
+
+  if (!form.vehicleId || !form.expiry) return;
+
+  if (form.issue && form.issue > form.expiry) {
+    window.alert("Issue date cannot be later than the expiry date.");
+    return;
   }
 
-  function save(e) {
-    e.preventDefault();
-    if (!form.vehicleId || !form.expiry) return;
-    if (form.issue && form.issue > form.expiry) {
-      window.alert("Issue date cannot be later than the expiry date.");
-      return;
+  if (!currentUserId) {
+    window.alert("Please sign in before saving a document.");
+    return;
+  }
+
+  let uploadedPath = null;
+
+  try {
+    const existingDocument = enriched.find(
+      (d) => String(d.id) === String(editingId)
+    );
+
+    const documentId = editingId ?? Date.now();
+
+    let fileDetails = {
+      filePath: existingDocument?.filePath || "",
+      fileName: existingDocument?.fileName || "",
+      fileMimeType: existingDocument?.fileMimeType || "",
+      fileSize: existingDocument?.fileSize || null,
+      source: existingDocument?.source || "manual",
+    };
+
+    if (pdfFile) {
+      const safeFileName = pdfFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+      const filePath =
+        `${currentUserId}/${form.vehicleId}/${documentId}/` +
+        `${Date.now()}-${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("vehicle-documents")
+        .upload(filePath, pdfFile, {
+          contentType: pdfFile.type,
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      uploadedPath = filePath;
+
+      fileDetails = {
+        filePath,
+        fileName: pdfFile.name,
+        fileMimeType: pdfFile.type,
+        fileSize: pdfFile.size,
+        source: "pdf_import",
+      };
+const { error: documentError } = await supabase
+  .from("documents")
+  .upsert(
+    {
+      id: String(documentId),
+      user_id: currentUserId,
+      vehicle_id: String(form.vehicleId),
+      type: form.type,
+      label: form.label || null,
+      number: form.number || null,
+      issue: form.issue || null,
+      expiry: form.expiry || null,
+      file_path: filePath,
+      file_name: pdfFile.name,
+      file_mime_type: pdfFile.type,
+      file_size: pdfFile.size,
+      source: "pdf_import",
+    },
+    { onConflict: "id" }
+  );
+
+if (documentError) throw documentError;
+      const { error: versionError } = await supabase
+        .from("document_versions")
+        .insert({
+          user_id: currentUserId,
+          document_id: String(documentId),
+          type: form.type,
+          number: form.number || null,
+          issue: form.issue || null,
+          expiry: form.expiry || null,
+          file_path: filePath,
+          file_name: pdfFile.name,
+          file_mime_type: pdfFile.type,
+          file_size: pdfFile.size,
+          source: "pdf_import",
+        });
+
+      if (versionError) throw versionError;
     }
 
-    const record = { ...form, vehicleId: Number(form.vehicleId) };
+    const record = {
+      ...form,
+      vehicleId: Number(form.vehicleId),
+      ...fileDetails,
+    };
+
     if (editingId !== null) {
-      setDocuments((docs) => docs.map((d) => (d.id === editingId ? { ...d, ...record } : d)));
+      setDocuments((docs) =>
+        docs.map((d) =>
+          d.id === editingId ? { ...d, ...record } : d
+        )
+      );
     } else {
-      setDocuments((docs) => [...docs, { id: Date.now(), ...record }]);
+      setDocuments((docs) => [
+        ...docs,
+        { id: documentId, ...record },
+      ]);
     }
+
     setForm({ ...blank, vehicleId: vehicles[0]?.id ?? "" });
     setEditingId(null);
     setShowForm(false);
+    setPdfFile(null);
+    setPdfText("");
+    setPdfDetectedRegistration("");
+    setPdfError("");
+
+    window.alert("Document saved successfully.");
+
+  } catch (error) {
+    console.error("Document save failed:", error);
+
+    if (uploadedPath) {
+      await supabase.storage
+        .from("vehicle-documents")
+        .remove([uploadedPath]);
+    }
+
+    window.alert(
+      `Could not save the document: ${error.message || "Unknown error"}`
+    );
   }
+}
 
   function closeForm() {
     setShowForm(false);
@@ -1337,6 +2294,48 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
 
   return (
     <>
+    <section className="panel pdf-import-panel">
+  <h2>Import a vehicle document</h2>
+  <p className="panel-subtitle">
+    Select an insurance, PUC or other PDF downloaded from WhatsApp Web.
+  </p>
+
+  <label className="pdf-file-label">
+    {pdfBusy ? "Reading PDF..." : "Choose PDF"}
+    <input
+      type="file"
+      accept="application/pdf,.pdf"
+      onChange={handlePdfSelect}
+      disabled={pdfBusy}
+    />
+  </label>
+
+  {pdfError && <p className="pdf-error">{pdfError}</p>}
+
+  {pdfText && (
+    <div className="pdf-extracted">
+      <strong>Extracted text</strong>
+      <p className="panel-subtitle">{pdfFile?.name}</p>
+      {pdfDetectedRegistration && (
+  <p className="pdf-detected-registration">
+    Detected registration: <strong>{pdfDetectedRegistration}</strong>
+  </p>
+)}
+      <pre>{pdfText}</pre>
+      <button
+        type="button"
+        className="ghost-button"
+        onClick={() => {
+          setPdfText("");
+          setPdfFile(null);
+          setPdfError("");
+        }}
+      >
+        Clear PDF
+      </button>
+    </div>
+  )}
+</section>
       <div className="toolbar">
         <select value={filter} onChange={(e) => setFilter(e.target.value)} className="filter-select">
           <option value="all">All vehicles</option>
@@ -1347,6 +2346,18 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
           ))}
         </select>
         <button
+          className="ghost-button"
+          onClick={gmailConnected ? reconnectGmail : connectGmail}
+          disabled={gmailConnecting || gmailStatusLoading}
+          type="button"
+        >
+          {gmailConnecting
+            ? "Connecting…"
+            : gmailConnected
+              ? "↻ Reconnect Gmail"
+              : "Connect Gmail"}
+        </button>
+        <button
           className="primary-button"
           onClick={openAddForm}
           disabled={!vehicles.length}
@@ -1354,10 +2365,48 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
           + Add document
         </button>
       </div>
+      <section className={`gmail-connection-card ${gmailConnected ? "is-connected" : ""}`} aria-live="polite">
+        <div className="gmail-connection-icon" aria-hidden="true">
+          {gmailStatusLoading ? "…" : gmailConnected ? "✓" : "✉"}
+        </div>
+        <div className="gmail-connection-copy">
+          <strong>
+            {gmailStatusLoading
+              ? "Checking Gmail connection…"
+              : gmailConnected
+                ? "Gmail account connected"
+                : "Gmail is not connected"}
+          </strong>
+          <span>
+            {gmailStatusLoading
+              ? "Checking the Google identity linked to your MyGarage account."
+              : gmailConnected
+                ? `${gmailAccountEmail ? `${gmailAccountEmail} · ` : ""}Google account linked successfully. Automatic email scanning is not active yet.`
+                : "Connect your Google account to prepare Gmail document detection."}
+          </span>
+        </div>
+        {!gmailStatusLoading && (
+          <span className={`gmail-connection-badge ${gmailConnected ? "connected" : "not-connected"}`}>
+            {gmailConnected ? "Connected" : "Not connected"}
+          </span>
+        )}
+      </section>
+      {gmailMessage && <p className="panel-subtitle gmail-connection-error">{gmailMessage}</p>}
+      {gmailConnected && (
+        <p className="panel-subtitle" aria-live="polite">
+          {gmailTokenStatus?.checked
+            ? `OAuth token check: access token ${gmailTokenStatus.hasAccessToken ? "received" : "not available"}; refresh token ${gmailTokenStatus.hasRefreshToken ? "received" : "not available"}.`
+            : "OAuth token check is waiting for a Google authentication callback."}
+          {" "}Token values are not displayed or copied into a separate MyGarage storage location.
+        </p>
+      )}
 
       {showForm && (
-        <form className="panel form-panel" onSubmit={save}>
-          <h2>{editingId !== null ? "Edit document" : "Add document"}</h2>
+<form
+  id="document-editor"
+  className="panel form-panel"
+  onSubmit={save}
+>          <h2>{editingId !== null ? "Edit document" : "Add document"}</h2>
           <div className="form-grid">
             <label>
               Vehicle
@@ -1447,40 +2496,156 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName }) {
                 <span>Expires: {formatDate(d.expiry)}</span>
               </div>
               <Status cls={d.info.cls} value={d.info.label} />
-              <div className="doc-actions">
-                <button className="ghost-button small" onClick={() => openEditForm(d)}>
-                  Edit
-                </button>
-                <button className="icon-button" onClick={() => remove(d.id)} title="Delete document">
-                  🗑
-                </button>
-              </div>
+             <div className="doc-actions">
+  {d.filePath && (
+    <button
+      type="button"
+      className="ghost-button small"
+      onClick={(event) => {
+        event.stopPropagation();
+        viewDocument(d);
+      }}
+    >
+      View PDF
+    </button>
+  )}
+
+  <button
+    type="button"
+    className="ghost-button small"
+    onClick={(event) => {
+      event.stopPropagation();
+      loadVersionHistory(d);
+    }}
+  >
+    Version History
+  </button>
+
+  <button
+    type="button"
+    className="ghost-button small"
+    onClick={(event) => {
+      event.stopPropagation();
+      openEditForm(d);
+    }}
+  >
+    Edit
+  </button>
+
+  <button
+    type="button"
+    className="icon-button"
+    onClick={(event) => {
+      event.stopPropagation();
+      remove(d.id);
+    }}
+    title="Delete document"
+  >
+    🗑
+  </button>
+</div>
             </div>
           ))}
         </div>
       )}
+      {historyDocument && (
+  <div className="panel" style={{ marginTop: 20 }}>
+    <div className="section-heading">
+      <div>
+        <h2>Document Version History</h2>
+        <p className="panel-subtitle">
+          {historyDocument.type} · {vehicleName(historyDocument.vehicleId)}
+        </p>
+      </div>
+
+      <button
+        className="ghost-button small"
+        onClick={() => setHistoryDocument(null)}
+      >
+        Close
+      </button>
+    </div>
+
+    {historyLoading ? (
+      <p className="panel-subtitle">Loading document history...</p>
+    ) : versionHistory.length === 0 ? (
+      <p className="panel-subtitle">No previous versions recorded.</p>
+    ) : (
+      <div className="doc-list">
+        {versionHistory.map((version) => (
+          <div className="doc-row" key={version.id}>
+            <div className="doc-main">
+              <strong>{version.file_name || "Document version"}</strong>
+              <span>Policy number: {version.number || "Not recorded"}</span>
+              <span>Expiry: {formatDate(version.expiry)}</span>
+              <span>
+                Recorded: {formatDate(version.recorded_at?.slice(0, 10))}
+              </span>
+            </div>
+
+            {version.file_path && (
+              <button
+                className="ghost-button small"
+                onClick={async () => {
+                  const { data, error } = await supabase.storage
+                    .from("vehicle-documents")
+                    .createSignedUrl(version.file_path, 300);
+
+                  if (error) {
+                    window.alert("Could not open PDF: " + error.message);
+                    return;
+                  }
+
+                  const pdfWindow = window.open("about:blank", "_blank");
+                  if (pdfWindow) {
+                    pdfWindow.opener = null;
+                    pdfWindow.location.href = data.signedUrl;
+                  }
+                }}
+              >
+                View PDF
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
     </>
   );
 }
 
 /* ---------- ALERTS PAGE ---------- */
 
-function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, setSettings, setActive }) {
+
+function AlertsPage({ allAlerts, vehicleName, setFlag, markAllRead, settings, setSettings, setActive }) {
   const [tab, setTab] = useState("active");
 
-  const staged = enriched.filter((d) => d.stage !== null).sort((a, b) => a.days - b.days);
-  const active = staged.filter((d) => !d.resolved);
-  const resolved = staged.filter((d) => d.resolved);
+  const staged = allAlerts
+    .filter((a) => a.stage !== null)
+    .sort((a, b) => {
+      if (a.days === null) return 1;
+      if (b.days === null) return -1;
+      return a.days - b.days;
+    });
+
+  const active = staged.filter((a) => !a.resolved);
+  const resolved = staged.filter((a) => a.resolved);
   const list = tab === "active" ? active : resolved;
-  const expired = list.filter((a) => a.days < 0);
-  const upcoming = list.filter((a) => a.days >= 0);
+
+  const expired = list.filter((a) => a.days !== null && a.days < 0);
+  const upcoming = list.filter((a) => a.days === null || a.days >= 0);
   const unreadCount = active.filter((a) => !a.read).length;
 
   const perm = "Notification" in window ? Notification.permission : "unsupported";
 
   function toggleInterval(n) {
     const has = settings.intervals.includes(n);
-    const next = has ? settings.intervals.filter((x) => x !== n) : [...settings.intervals, n];
+    const next = has
+      ? settings.intervals.filter((x) => x !== n)
+      : [...settings.intervals, n];
+
     if (!next.length) return;
     setSettings({ ...settings, intervals: next.sort((x, y) => y - x) });
   }
@@ -1490,36 +2655,83 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
       window.alert("This browser does not support notifications.");
       return;
     }
+
     const result = await Notification.requestPermission();
     setSettings({ ...settings, browser: result === "granted" });
   }
 
   function renderRow(a) {
+    const isService = a.kind === "service";
+    const name = isService ? a.label : docName(a);
+    const vehicle = a.vehicleName || vehicleName(a.vehicleId);
+
+    let detail;
+
+    if (isService) {
+      const parts = [];
+
+      if (a.date) {
+        parts.push(`Due date: ${formatDate(a.date)}`);
+      }
+
+      if (a.kmDue) {
+        parts.push(`Target: ${Number(a.targetOdometer ?? a.nextOdometer).toLocaleString("en-IN")} km`);
+      }
+
+      if (!parts.length) {
+        parts.push("Service kilometre target reached");
+      }
+
+      detail = parts.join(" · ");
+    } else {
+      detail = `${stageLabel(a.stage)} · expiry ${formatDate(a.expiry)}`;
+    }
+
     return (
-      <div key={a.key} className={`alert-row alert-${a.info.cls} ${a.read || a.resolved ? "" : "unread"}`}>
+      <div
+        key={a.key}
+        className={`alert-row alert-${a.info.cls} ${a.read || a.resolved ? "" : "unread"}`}
+      >
         <div className="alert-text">
           <strong>
             {!a.read && !a.resolved && <i className="dot" />}
-            {docName(a)} · {vehicleName(a.vehicleId)}
+            {name} · {vehicle}
           </strong>
-          <span>
-            {stageLabel(a.stage)} · expiry {formatDate(a.expiry)}
-          </span>
+          <span>{detail}</span>
+          {a.resolved && (
+  <span>
+    Resolved on: {a.resolvedAt
+      ? new Date(a.resolvedAt).toLocaleString("en-IN")
+      : "Date not recorded"}
+  </span>
+)}
         </div>
+
         <Status cls={a.info.cls} value={a.info.label} />
+
         <div className="alert-actions">
           {a.resolved ? (
-            <button className="ghost-button small" onClick={() => setFlag(a.key, { resolved: false })}>
+            <button
+              className="ghost-button small"
+              onClick={() => setFlag(a.key, { resolved: false })}
+            >
               Restore
             </button>
           ) : (
             <>
               {!a.read && (
-                <button className="ghost-button small" onClick={() => setFlag(a.key, { read: true })}>
+                <button
+                  className="ghost-button small"
+                  onClick={() => setFlag(a.key, { read: true })}
+                >
                   Mark read
                 </button>
               )}
-              <button className="ghost-button small" onClick={() => setFlag(a.key, { resolved: true, read: true })}>
+
+              <button
+                className="ghost-button small"
+                onClick={() => setFlag(a.key, { resolved: true, read: true })}
+              >
                 Resolve
               </button>
             </>
@@ -1534,9 +2746,9 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
       <div className="panel form-panel">
         <h2>Alert settings</h2>
         <p className="panel-subtitle">
-          Warn me this many days before a document expires (an alert also fires on the expiry day and
-          after expiry):
+          Warn me this many days before a document expires (an alert also fires on the expiry day and after expiry):
         </p>
+
         <div className="chips">
           {INTERVAL_OPTIONS.map((n) => (
             <button
@@ -1548,17 +2760,19 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
             </button>
           ))}
         </div>
+
         <div className="notify-row">
           <div>
             <strong>Browser notifications</strong>
             <span>
               {perm === "unsupported" && "Not supported in this browser."}
-              {perm === "denied" && "Blocked. Allow notifications for localhost in your browser's site settings."}
+              {perm === "denied" && "Blocked. Allow notifications for this site in your browser settings."}
               {perm === "default" && "Show a pop-up when a new alert fires (while MyGarage is open in a tab)."}
               {perm === "granted" &&
                 (settings.browser ? "On" : "Permission granted, currently switched off.")}
             </span>
           </div>
+
           {perm === "granted" ? (
             <button
               className="ghost-button small"
@@ -1578,13 +2792,21 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
 
       <div className="toolbar">
         <div className="tabs">
-          <button className={`tab ${tab === "active" ? "on" : ""}`} onClick={() => setTab("active")}>
+          <button
+            className={`tab ${tab === "active" ? "on" : ""}`}
+            onClick={() => setTab("active")}
+          >
             Active ({active.length})
           </button>
-          <button className={`tab ${tab === "resolved" ? "on" : ""}`} onClick={() => setTab("resolved")}>
+
+          <button
+            className={`tab ${tab === "resolved" ? "on" : ""}`}
+            onClick={() => setTab("resolved")}
+          >
             Resolved ({resolved.length})
           </button>
         </div>
+
         {tab === "active" && unreadCount > 0 && (
           <button className="ghost-button" onClick={markAllRead}>
             Mark all read ({unreadCount})
@@ -1597,9 +2819,10 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
           <h2>{tab === "active" ? "All clear" : "Nothing resolved yet"}</h2>
           <p className="panel-subtitle">
             {tab === "active"
-              ? "No documents are inside your alert window. Alerts appear automatically as expiry dates approach."
-              : "Alerts you resolve move here."}
+              ? "No document or service alerts are currently due."
+              : "Alerts you resolve will appear here."}
           </p>
+
           {tab === "active" && (
             <button className="view-button" onClick={() => setActive("Documents")}>
               Manage documents →
@@ -1612,21 +2835,24 @@ function AlertsPage({ enriched, vehicleName, setFlag, markAllRead, settings, set
             <section className="section">
               <div className="section-heading">
                 <div>
-                  <h2>Expired</h2>
-                  <p>{expired.length} document(s) overdue</p>
+                  <h2>Overdue</h2>
+                  <p>{expired.length} alert(s) past their due date</p>
                 </div>
               </div>
+
               <div className="alert-list">{expired.map(renderRow)}</div>
             </section>
           )}
+
           {upcoming.length > 0 && (
             <section className="section">
               <div className="section-heading">
                 <div>
-                  <h2>Upcoming expiries</h2>
-                  <p>Inside your alert window</p>
+                  <h2>Upcoming alerts</h2>
+                  <p>Documents and services approaching their due dates or targets</p>
                 </div>
               </div>
+
               <div className="alert-list">{upcoming.map(renderRow)}</div>
             </section>
           )}
