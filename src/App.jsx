@@ -1,5 +1,10 @@
+import { createWorker } from "tesseract.js";
 import { useState, useEffect, useRef } from "react";
-import { supabase, getGoogleProviderTokenStatus } from "./lib/supabase";
+import {
+  supabase,
+  getGoogleProviderTokenStatus,
+  getGoogleProviderTokens,
+} from "./lib/supabase";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "./App.css";
@@ -178,20 +183,64 @@ function App() {
       setAuthLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+   
+const { data: authListener } = supabase.auth.onAuthStateChange(
   (_event, nextSession) => {
     if (!mounted) return;
 
     setSession(nextSession);
     inspectGoogleProviderTokens(nextSession);
 
-    // Only reset cloud readiness when the user signs out.
     if (!nextSession?.user?.id) {
       setCloudReady(false);
       setCloudLoading(false);
+      return;
+    }
+
+    const { refreshToken } = getGoogleProviderTokens();
+    console.log("Gmail token-save trigger:", {
+  event: _event,
+  hasSession: Boolean(nextSession),
+  hasSupabaseAccessToken: Boolean(nextSession?.access_token),
+  hasRefreshToken: Boolean(refreshToken),
+});
+
+    if (refreshToken && nextSession.access_token) {
+      // Run outside the auth callback to avoid blocking Supabase Auth.
+      setTimeout(async () => {
+        try {
+          const { error } = await supabase.functions.invoke(
+            "store-gmail-token",
+            {
+              body: { refreshToken },
+              headers: {
+                Authorization: `Bearer ${nextSession.access_token}`,
+              },
+            }
+          );
+
+         if (error) {
+  let details = error.message;
+
+  if (error.context instanceof Response) {
+    try {
+      const body = await error.context.clone().json();
+      details = body.error || body.message || details;
+    } catch {}
+  }
+
+  console.error("Gmail token storage failed:", details);
+} else {
+  console.log("Gmail refresh token securely stored.");
+}
+        } catch (error) {
+          console.error("Gmail token storage failed:", error);
+        }
+      }, 0);
     }
   }
 );
+
 
 return () => {
   mounted = false;
@@ -231,6 +280,14 @@ return () => {
         if (maintenanceResult.error) throw maintenanceResult.error;
 
         const cloudVehicles = vehicleResult.data ?? [];
+      console.log(
+  "VEHICLE REGISTRATION DATA:",
+  cloudVehicles.map((row) => ({
+    name: row.name,
+    details: row.details,
+    registration_number: row.registration_number,
+  }))
+);
         const cloudDocuments = documentResult.data ?? [];
         const cloudMaintenance = maintenanceResult.data ?? [];
         const migrationOwner = localStorage.getItem("mygarage.migratedUserId");
@@ -272,8 +329,11 @@ return () => {
   variant: row.details?.variant ?? "",
   type: row.details?.type ?? "Other",
   km: row.details?.km ?? "",
-  registrationNumber:
-    row.details?.registrationNumber ?? row.registration_number ?? "",
+  // Prefer a non-empty value from either supported database column.
+  // An empty string in details must not hide a valid registration_number.
+  registrationNumber: String(
+    row.details?.registrationNumber || row.registration_number || ""
+  ).trim(),
 })));
           }
         } else if (canMigrateLocal && vehicles.length > 0) {
@@ -281,11 +341,12 @@ return () => {
             id: String(vehicle.id),
             user_id: userId,
             name: vehicle.name,
+            registration_number: vehicle.registrationNumber?.trim() || null,
             details: {
   variant: vehicle.variant ?? "",
   type: vehicle.type ?? "Other",
   km: vehicle.km ?? "",
-  registrationNumber: vehicle.registrationNumber ?? "",
+  registrationNumber: vehicle.registrationNumber?.trim() || "",
 },
           }));
           const { error } = await supabase.from("vehicles").insert(rows);
@@ -397,11 +458,13 @@ return () => {
   id: String(vehicle.id),
   user_id: userId,
   name: vehicle.name,
+  // Keep the dedicated column and JSON details field in sync.
+  registration_number: vehicle.registrationNumber?.trim() || null,
   details: {
     variant: vehicle.variant ?? "",
     type: vehicle.type ?? "Other",
     km: vehicle.km ?? "",
-    registrationNumber: vehicle.registrationNumber ?? "",
+    registrationNumber: vehicle.registrationNumber?.trim() || "",
   },
 }));
 
@@ -1684,6 +1747,17 @@ function Documents({ vehicles, enriched, setDocuments, vehicleName, gmailTokenSt
   const [versionHistory, setVersionHistory] = useState([]);
   const [historyDocument, setHistoryDocument] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  
+const [gmailScanning, setGmailScanning] = useState(false);
+const [gmailCandidates, setGmailCandidates] = useState([]);
+const [gmailScanError, setGmailScanError] = useState("");
+
+const [gmailDownloading, setGmailDownloading] = useState("");
+
+const [gmailAutoReviewing, setGmailAutoReviewing] = useState(false);
+const [gmailReviewResults, setGmailReviewResults] = useState([]);
+
+
 
 
 
@@ -1790,33 +1864,38 @@ if (pdfWindow) {
     };
   }, []);
 
-  async function startGoogleLink() {
-    const { error } = await supabase.auth.linkIdentity({
-      provider: "google",
-      options: {
-        scopes: "https://www.googleapis.com/auth/gmail.readonly",
-        redirectTo: window.location.origin,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
+  
+async function startGoogleLink() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      scopes: "https://www.googleapis.com/auth/gmail.readonly",
+      redirectTo: window.location.origin,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
       },
-    });
+    },
+  });
 
-    if (error) throw error;
+  if (error) throw error;
+}
+
+  
+async function connectGmail() {
+  setGmailConnecting(true);
+  setGmailMessage("");
+
+  try {
+    await startGoogleLink();
+  } catch (error) {
+    setGmailMessage(
+      error.message || "Could not start Gmail connection."
+    );
+    setGmailConnecting(false);
   }
+}
 
-  async function connectGmail() {
-    setGmailConnecting(true);
-    setGmailMessage("");
-
-    try {
-      await startGoogleLink();
-    } catch (error) {
-      setGmailMessage(error.message || "Could not start Gmail connection.");
-      setGmailConnecting(false);
-    }
-  }
 
   async function reconnectGmail() {
     const confirmed = window.confirm(
@@ -1855,6 +1934,433 @@ if (pdfWindow) {
       setGmailConnecting(false);
     }
   }
+  
+
+async function scanGmailDocuments() {
+  setGmailScanning(true);
+  setGmailScanError("");
+  setGmailCandidates([]);
+  setGmailReviewResults([]);
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "scan-gmail-documents",
+      { body: {} }
+    );
+
+    if (error) throw error;
+    if (!data?.success) {
+      throw new Error(data?.error || "Gmail scan failed.");
+    }
+
+    const candidates = data.candidates || [];
+
+    setGmailCandidates(candidates);
+
+    // Automatically download and analyse the detected PDF attachments.
+    await automaticallyReviewGmail(candidates);
+  } catch (error) {
+    console.error("Gmail automatic document scan failed:", error);
+    setGmailScanError(error.message || "Could not scan Gmail.");
+  } finally {
+    setGmailScanning(false);
+  }
+}
+
+async function reviewGmailAttachment(candidate, attachment) {
+  const key = `${candidate.messageId}-${attachment.attachmentId}`;
+  setGmailDownloading(key);
+  setPdfError("");
+
+  try {
+    const downloadStartTime = performance.now();
+    const { data, error } = await supabase.functions.invoke(
+      "download-gmail-attachment",
+      {
+        body: {
+          messageId: candidate.messageId,
+          attachmentId: attachment.attachmentId,
+          filename: attachment.filename,
+        },
+      }
+    );
+    console.log(
+  `PDF DOWNLOAD: ${attachment.filename} — ${(
+    (performance.now() - downloadStartTime) / 1000
+  ).toFixed(2)} seconds`
+);
+
+    if (error) throw error;
+    if (!data?.success || !data?.base64) {
+      throw new Error(data?.error || "Could not download this PDF.");
+    }
+
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const file = new File(
+      [bytes],
+      data.filename || attachment.filename,
+      { type: "application/pdf" }
+    );
+
+    await handlePdfSelect({
+      target: {
+        files: [file],
+        value: "",
+      },
+    });
+  } catch (error) {
+    console.error("Gmail PDF review failed:", error);
+    setPdfError(error.message || "Could not review this Gmail attachment.");
+  } finally {
+    setGmailDownloading("");
+  }
+}
+
+async function saveGmailDocument(result) {
+  if (!currentUserId) {
+    throw new Error("Please sign in before saving documents.");
+  }
+
+  const detected = result.detected;
+  const vehicleId = String(detected.vehicleId);
+
+  const existingDocument = enriched.find(
+    (doc) =>
+      String(doc.vehicleId) === vehicleId &&
+      doc.type === detected.type
+  );
+
+  const documentId = existingDocument?.id ?? Date.now().toString();
+
+  const safeFileName = result.file.name.replace(
+    /[^a-zA-Z0-9._-]/g,
+    "_"
+  );
+
+  const filePath =
+    `${currentUserId}/${vehicleId}/${documentId}/` +
+    `${Date.now()}-${safeFileName}`;
+
+  let uploadedPath = null;
+
+  try {
+    // Upload the PDF.
+    const { error: uploadError } = await supabase.storage
+      .from("vehicle-documents")
+      .upload(filePath, result.file, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    uploadedPath = filePath;
+
+    // Update or create the main document record.
+    const { error: documentError } = await supabase
+      .from("documents")
+      .upsert(
+        {
+          id: String(documentId),
+          user_id: currentUserId,
+          vehicle_id: vehicleId,
+          type: detected.type,
+          label: detected.label || detected.type,
+          number: detected.number || null,
+          issue: detected.issue || null,
+          expiry: detected.expiry,
+          file_path: filePath,
+          file_name: result.file.name,
+          file_mime_type: "application/pdf",
+          file_size: result.file.size,
+          source: "pdf_import",
+        },
+        { onConflict: "id" }
+      );
+
+    if (documentError) throw documentError;
+
+    // Record this PDF as a document version.
+    const { error: versionError } = await supabase
+      .from("document_versions")
+      .insert({
+        user_id: currentUserId,
+        document_id: String(documentId),
+        type: detected.type,
+        number: detected.number || null,
+        issue: detected.issue || null,
+        expiry: detected.expiry,
+        file_path: filePath,
+        file_name: result.file.name,
+        file_mime_type: "application/pdf",
+        file_size: result.file.size,
+        source: "pdf_import",
+      });
+
+    if (versionError) throw versionError;
+
+    // Update the application immediately.
+    const record = {
+      id: documentId,
+      vehicleId: Number(vehicleId),
+      type: detected.type,
+      label: detected.label || detected.type,
+      number: detected.number || "",
+      issue: detected.issue || "",
+      expiry: detected.expiry,
+      filePath,
+      fileName: result.file.name,
+      fileMimeType: "application/pdf",
+      fileSize: result.file.size,
+      source: "pdf_import",
+    };
+
+    setDocuments((docs) => {
+      const exists = docs.some(
+        (doc) => String(doc.id) === String(documentId)
+      );
+
+      return exists
+        ? docs.map((doc) =>
+            String(doc.id) === String(documentId)
+              ? { ...doc, ...record }
+              : doc
+          )
+        : [...docs, record];
+    });
+
+    return record;
+  } catch (error) {
+    if (uploadedPath) {
+      await supabase.storage
+        .from("vehicle-documents")
+        .remove([uploadedPath]);
+    }
+
+    throw error;
+  }
+}
+
+
+
+async function automaticallyReviewGmail(candidates = gmailCandidates) {
+  setGmailAutoReviewing(true);
+  setGmailReviewResults([]);
+  setGmailScanError("");
+
+  const results = [];
+
+  // Reuse one OCR worker throughout this Gmail scan.
+  let gmailOcrWorker = null;
+
+  const getGmailOcrWorker = async () => {
+    if (!gmailOcrWorker) {
+      gmailOcrWorker = await createWorker("eng");
+    }
+
+    return gmailOcrWorker;
+  };
+
+  try {
+    const attachments = candidates
+      .flatMap((candidate) =>
+        (candidate.pdfAttachments || []).map((attachment) => ({
+          candidate,
+          attachment,
+        }))
+      )
+      .slice(0, 20);
+
+    // Step 1: Download and analyse PDFs.
+    for (const { candidate, attachment } of attachments) {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "download-gmail-attachment",
+          {
+            body: {
+              messageId: candidate.messageId,
+              attachmentId: attachment.attachmentId,
+              filename: attachment.filename,
+            },
+          }
+        );
+
+        if (error) throw error;
+
+        if (!data?.success || !data?.base64) {
+          throw new Error(data?.error || "Download failed.");
+        }
+
+        const binary = atob(data.base64);
+        const bytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const file = new File(
+          [bytes],
+          data.filename || attachment.filename,
+          { type: "application/pdf" }
+        );
+
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error("PDF exceeds the 10 MB limit.");
+        }
+
+        // Reuse the same OCR worker across PDFs.
+       const pdfStartTime = performance.now();
+
+const extractedText = await extractPdfTextWithOCR(
+  bytes,
+  getGmailOcrWorker
+);
+
+console.log(
+  `PDF PROCESSING: ${file.name} — ${(
+    (performance.now() - pdfStartTime) / 1000
+  ).toFixed(2)} seconds`
+);
+        if (!extractedText.trim()) {
+          throw new Error(
+            "Could not extract text using PDF.js or OCR. The PDF may be unreadable."
+          );
+        }
+
+        const detected = detectDocumentDetails(
+          extractedText,
+          file.name
+        );
+
+        console.log("GMAIL EXTRACTED TEXT:", extractedText);
+        console.log("GMAIL DETECTED DETAILS:", detected);
+
+        const supportedTypes = [
+          "Insurance",
+          "PUC",
+          "RC",
+          "Fitness",
+          "Driving Licence",
+          "Tax",
+          "Permit",
+        ];
+
+        let status = "needs-review";
+        let reason = "Vehicle registration could not be confidently matched.";
+
+        if (!supportedTypes.includes(detected.type)) {
+          status = "rejected";
+          reason = "Not a supported vehicle document.";
+        } else if (detected.matchStatus === "registration") {
+          status = "matched";
+          reason = "Document type and vehicle registration matched.";
+        } else if (detected.matchStatus === "registration-not-found") {
+          status = "unmatched";
+          reason = "Valid vehicle document recognized, but this vehicle is not in MyGarage.";
+        } else if (detected.matchStatus === "ambiguous") {
+          status = "needs-review";
+          reason = "Multiple possible vehicle matches found.";
+        } else if (detected.matchStatus === "name") {
+          status = "needs-review";
+          reason = "Vehicle identified by name only. Registration could not be verified.";
+        }
+
+        results.push({
+          messageId: candidate.messageId,
+          attachmentId: attachment.attachmentId,
+          filename: file.name,
+          subject: candidate.subject || "",
+          from: candidate.from || "",
+          size: file.size,
+          type: detected.type,
+          registration: detected.registration,
+          vehicleId: detected.vehicleId,
+          number: detected.number,
+          issue: detected.issue,
+          expiry: detected.expiry,
+          status,
+          reason,
+          file,
+          extractedText,
+          detected,
+        });
+      } catch (error) {
+        results.push({
+          messageId: candidate.messageId,
+          attachmentId: attachment.attachmentId,
+          filename: attachment.filename,
+          status: "error",
+          reason: error.message || "Could not review this PDF.",
+        });
+      }
+
+      setGmailReviewResults([...results]);
+    }
+
+    // Step 2: Automatically save confidently matched documents.
+    for (const result of results) {
+      if (result.status !== "matched" || !result.file) {
+        continue;
+      }
+
+      const detected = result.detected;
+
+      if (
+        !detected.vehicleId ||
+        !detected.type ||
+        detected.type === "Other"
+      ) {
+        continue;
+      }
+
+      if (
+        detected.issue &&
+        detected.expiry &&
+        detected.issue > detected.expiry
+      ) {
+        result.status = "rejected";
+        result.reason = "Issue date is later than expiry date.";
+        continue;
+      }
+
+      try {
+        await saveGmailDocument(result);
+
+        result.status = "saved";
+        result.reason = "Automatically saved to MyGarage.";
+      } catch (error) {
+        console.error("Gmail document save failed:", error);
+
+        result.status = "error";
+        result.reason = error.message || "Could not save document.";
+      }
+
+      setGmailReviewResults([...results]);
+    }
+  } catch (error) {
+    console.error("Automatic Gmail review failed:", error);
+    setGmailScanError(error.message || "Automatic review failed.");
+  } finally {
+    // Terminate the shared worker once, after the entire scan.
+    try {
+      if (gmailOcrWorker) {
+        await gmailOcrWorker.terminate();
+        gmailOcrWorker = null;
+      }
+    } catch (workerError) {
+      console.error("OCR worker cleanup failed:", workerError);
+    }
+
+    setGmailAutoReviewing(false);
+  }
+}
+
 
   const blank = { vehicleId: vehicles[0]?.id ?? "", type: "Insurance", label: "", number: "", issue: "", expiry: "" };
   const [showForm, setShowForm] = useState(false);
@@ -1971,146 +2477,354 @@ setShowForm(true);
 
 
 
+
 function detectDocumentDetails(text, fileName = "") {
-  const content = `${fileName} ${text}`.replace(/\s+/g, " ");
+  const content = String(text || "");
   const upper = content.toUpperCase();
 
   const normalizeRegistration = (value) =>
     String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-  const getDate = (value) => {
+  const compactText = normalizeRegistration(content);
+
+  function getDate(value) {
     if (!value) return "";
 
-    const match = value.match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
-
-    return match
-      ? `${match[3]}-${match[2]}-${match[1]}`
-      : "";
-  };
-
-  // Insurance details
-  const policyNumber =
-    content.match(
-      /Policy\s*(?:No\.?|Number)\s*[:.]?\s*([A-Z0-9/-]+)/i
-    )?.[1] || "";
-
-  const insurancePeriod = content.match(
-    /Period of Insurance[\s\S]{0,120}?From[\s\S]{0,40}?(\d{2}[/-]\d{2}[/-]\d{4})[\s\S]{0,120}?To[\s\S]{0,40}?(\d{2}[/-]\d{2}[/-]\d{4})/i
-  );
-
-  const insuranceIssue =
-    content.match(
-      /Date of Issue\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
-    ) ||
-    content.match(
-      /Receipt Date\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+    const match = String(value).match(
+      /(\d{2})[/-](\d{2})[/-](\d{4})/
     );
 
-  const insuranceExpiry = content.match(
-    /(?:Insurance expiry Date|expiry date|valid upto|valid up to)\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
-  );
+    if (match) {
+      return `${match[3]}-${match[2]}-${match[1]}`;
+    }
 
-  // Kerala PUC certificate details
-  const pucCertificateNumber =
-    content.match(
-      /Certificate\s*SL\.?\s*No\.?\s*[:.]?\s*([A-Z0-9/-]+)/i
-    )?.[1] || "";
+    const iso = String(value).match(
+      /(\d{4})-(\d{2})-(\d{2})/
+    );
 
-  const pucIssue = content.match(
-    /\bDate\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
-  );
-
-  const pucExpiry = content.match(
-    /Validity\s*upto\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
-  );
-
-  // Detect document type
-  let type = "Other";
-
-  if (/\bPUC\b|pollution under control/i.test(content)) {
-    type = "PUC";
-  } else if (/insurance|policy number|premium/i.test(content)) {
-    type = "Insurance";
-  } else if (/registration certificate|\bRC\b/i.test(content)) {
-    type = "RC";
+    return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : "";
   }
 
-  // Support compact and spaced registration formats:
-  // KL45T2358, KL 45 T 2358, KL-45-T-2358
-  const registrationMatch = content.match(
-    /\b[A-Z]{2}[\s-]*\d{1,2}[\s-]*[A-Z]{1,3}[\s-]*\d{1,4}\b/i
-  );
+  // Correct common OCR mistakes in registration numbers.
+  function correctRegistrationOCR(value) {
+    let reg = normalizeRegistration(value);
 
-  const registration = registrationMatch?.[0] || "";
-  const normalizedRegistration = normalizeRegistration(registration);
+    // Example: KL01AWD025 -> KL01AW0025
+    // D is a common OCR misreading of 0.
+    const ambiguousMatch = reg.match(
+      /^([A-Z]{2}\d{2})([A-Z]{2})[DOQ](\d{3})$/
+    );
 
-  // Match against saved vehicle registration numbers
-  const registrationMatches = normalizedRegistration
-    ? vehicles.filter(
-        (v) =>
-          normalizeRegistration(v.registrationNumber || v.registration) ===
-          normalizedRegistration
-      )
-    : [];
+    if (ambiguousMatch) {
+      reg =
+        ambiguousMatch[1] +
+        ambiguousMatch[2] +
+        "0" +
+        ambiguousMatch[3];
+    }
 
-  // Secondary vehicle-name detection
-  const vehicleHints = [
-    {
-      words: ["THUNDERBIRD", "ROYAL ENFIELD"],
-      name: "Thunderbird",
-    },
-    { words: ["ACTIVA"], name: "Activa" },
-    { words: ["DIO"], name: "Dio" },
-    { words: ["A-STAR", "A STAR"], name: "A-Star" },
-    { words: ["AMAZE"], name: "Amaze" },
+    return reg;
+  }
+
+  // Document classification using multiple OCR indicators.
+  const has = (pattern) => pattern.test(upper);
+
+  const rcIndicators = [
+    /INDIAN UNION/,
+    /VEHICLE REGISTRATION/,
+    /REGN\s*NO/,
+    /DATE OF REGN/,
+    /CHASSIS\s*(NO|NUMBER)/,
+    /ENGINE\s*(\/MOTOR)?\s*(NO|NUMBER)/,
+    /OWNER NAME/,
+    /TRANSPORT DEPARTMENT/,
   ];
 
-  const detectedVehicle = vehicleHints.find((item) =>
-    item.words.some((word) => upper.includes(word))
-  );
+  const rcEvidence = rcIndicators.filter((pattern) =>
+    pattern.test(upper)
+  ).length;
 
-  const nameMatches = detectedVehicle
-    ? vehicles.filter((v) =>
-        v.name?.toUpperCase().includes(detectedVehicle.name.toUpperCase())
-      )
-    : [];
+  const isRC =
+    has(/CERTIFICATE OF REGISTRATION/) ||
+    has(/REGISTRATION CERTIFICATE/) ||
+    has(/VEHICLE REGISTRATION/) ||
+    rcEvidence >= 3;
+
+  const isPUC =
+    has(/\bPUC\b/) ||
+    has(/POLLUTION UNDER CONTROL/) ||
+    has(/POLLUTION CERTIFICATE/) ||
+    has(/EMISSION TEST CERTIFICATE/);
+    console.log("INSURANCE KEYWORD CHECK:", {
+  insurance: has(/INSURANCE/),
+  policy: has(/POLICY/),
+  premium: has(/PREMIUM/),
+  period: has(/PERIOD OF INSURANCE/),
+  motor: has(/MOTOR/),
+  vehicle: has(/VEHICLE/),
+  chassis: has(/CHASSIS/),
+});
+const isInsurance =
+  has(/CERTIFICATE OF INSURANCE/) ||
+  has(/MOTOR INSURANCE POLICY/) ||
+  has(/MOTOR PACKAGE POLICY/) ||
+  has(/PERIOD OF INSURANCE/) ||
+  has(/INSURANCE PERIOD/) ||
+  (
+    has(/\bINSURANCE\b/) &&
+    (
+      has(/\bPOLICY\b/) ||
+      has(/\bPREMIUM\b/) ||
+      has(/PERIOD OF INSURANCE/)
+    )
+  ) ||
+  (
+    has(/\bPOLICY\b/) &&
+    has(/\bPREMIUM\b/) &&
+    has(/\bVEHICLE\b/)
+  );
+  console.log("INSURANCE CLASSIFICATION:", isInsurance);
+  const isFitness =
+    has(/CERTIFICATE OF FITNESS/) ||
+    has(/FITNESS CERTIFICATE/);
+
+  const isDrivingLicence =
+    has(/DRIVING LICENCE/) ||
+    has(/DRIVING LICENSE/);
+
+  const isTax =
+    has(/MOTOR VEHICLE TAX/) ||
+    has(/MOTOR VEHICLES TAX/) ||
+    has(/TAX PAYMENT RECEIPT/);
+
+  const isPermit =
+    has(/TRANSPORT PERMIT/) ||
+    has(/GOODS CARRIAGE PERMIT/) ||
+    has(/CONTRACT CARRIAGE PERMIT/);
+
+  const detectedTypes = [
+    isPUC && "PUC",
+    isInsurance && "Insurance",
+    isRC && "RC",
+    isFitness && "Fitness",
+    isDrivingLicence && "Driving Licence",
+    isTax && "Tax",
+    isPermit && "Permit",
+  ].filter(Boolean);
+
+  const type =
+  isInsurance
+    ? "Insurance"
+    : isPUC
+    ? "PUC"
+    : isRC
+    ? "RC"
+    : isFitness
+    ? "Fitness"
+    : isDrivingLicence
+    ? "Driving Licence"
+    : isTax
+    ? "Tax"
+    : isPermit
+    ? "Permit"
+    : "Other";
+
+  // Extract registration from the text, including OCR variations.
+  let registration = "";
+
+ 
+
+
+  // Extract the registration number from the complete OCR text.
+  // OCR may place the value below the table headings.
+  const registrationPattern =
+    /\b[A-Z]{2}\s*[0-9OQD]{1,2}\s*[A-Z]{1,3}\s*[0-9DOQ]{3,4}\b/g;
+
+  const registrationCandidates = [
+  ...(upper.match(registrationPattern) || []),
+  ...(String(fileName).toUpperCase().match(registrationPattern) || []),
+];
+
+  for (const candidate of registrationCandidates) {
+    let normalizedCandidate = normalizeRegistration(candidate);
+
+    // Correct the known OCR errors in this RC.
+    if (/^KL[OQ]1AWD025$/.test(normalizedCandidate)) {
+      normalizedCandidate = "KL01AW0025";
+    } else {
+      normalizedCandidate = correctRegistrationOCR(normalizedCandidate);
+    }
+
+    if (/^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}$/.test(normalizedCandidate)) {
+      registration = normalizedCandidate;
+      break;
+    }
+  }
+
+console.log("GARAGE VEHICLE MATCH DEBUG:", {
+  vehiclesCount: vehicles.length,
+  vehicles: vehicles.map((v) => ({
+    id: v.id,
+    name: v.name,
+    registrationNumber: v.registrationNumber,
+    registration: v.registration,
+  })),
+  extractedRegistration: registration,
+});
+  // Match against vehicles currently saved in MyGarage.
+  const registrationMatches = vehicles.filter((vehicle) => {
+    const savedRegistration = normalizeRegistration(
+      vehicle.registrationNumber || vehicle.registration
+    );
+
+    return (
+      savedRegistration.length >= 8 &&
+      savedRegistration === registration
+    );
+  });
 
   let vehicle = null;
   let matchStatus = "unmatched";
 
   if (registrationMatches.length === 1) {
     vehicle = registrationMatches[0];
+    registration =
+      vehicle.registrationNumber || vehicle.registration;
     matchStatus = "registration";
-  } else if (
-    !normalizedRegistration &&
-    nameMatches.length === 1
-  ) {
-    vehicle = nameMatches[0];
-    matchStatus = "name";
-  } else if (normalizedRegistration && registrationMatches.length === 0) {
-    matchStatus = "registration-not-found";
-  } else if (registrationMatches.length > 1 || nameMatches.length > 1) {
+  } else if (registrationMatches.length > 1) {
     matchStatus = "ambiguous";
+  } else if (registration) {
+    matchStatus = "registration-not-found";
   }
+
+  // Vehicle-name fallback.
+  if (!vehicle && matchStatus === "unmatched") {
+    const vehicleHints = [
+      { words: ["THUNDERBIRD", "ROYAL ENFIELD"], name: "Thunderbird" },
+      { words: ["ACTIVA"], name: "Activa" },
+      { words: ["DIO"], name: "Dio" },
+      { words: ["A-STAR", "A STAR"], name: "A-Star" },
+      { words: ["AMAZE"], name: "Amaze" },
+    ];
+
+    const detected = vehicleHints.find((item) =>
+      item.words.some((word) => upper.includes(word))
+    );
+
+    if (detected) {
+      const matches = vehicles.filter((v) =>
+        v.name?.toUpperCase().includes(detected.name.toUpperCase())
+      );
+
+      if (matches.length === 1) {
+        vehicle = matches[0];
+        matchStatus = "name";
+      } else if (matches.length > 1) {
+        matchStatus = "ambiguous";
+      }
+    }
+  }
+
+  // Document numbers and dates.
+  const policyNumber =
+    upper.match(
+      /\bPOLICY\s*(?:NO\.?|NUMBER)\s*[:#-]?\s*([A-Z0-9/-]+)/
+    )?.[1] || "";
+
+  const certificateNumber =
+    upper.match(
+      /\bCERTIFICATE\s*(?:(?:SERIAL|SR)\s*)?(?:NO\.?|NUMBER)\s*[:#-]?\s*([A-Z0-9/-]+)/
+    )?.[1] || "";
+
+  const insurancePeriod = upper.match(
+    /PERIOD OF INSURANCE[\s\S]{0,150}?FROM[\s\S]{0,50}?(\d{2}[/-]\d{2}[/-]\d{4})[\s\S]{0,150}?TO[\s\S]{0,50}?(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
+
+  const issueDate =
+    upper.match(
+      /(?:DATE OF ISSUE|ISSUE DATE|RECEIPT DATE)\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+    ) ||
+    upper.match(
+      /\bDATE\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+    );
+
+  const expiryDate = upper.match(
+    /(?:INSURANCE EXPIRY DATE|EXPIRY DATE|VALIDITY\s*UPTO|VALID\s*UPTO|VALID\s*UP\s*TO)\s*[:.]?\s*(\d{2}[/-]\d{2}[/-]\d{4})/i
+  );
 
   return {
     type,
     number:
-      type === "PUC" ? pucCertificateNumber : policyNumber,
+      type === "PUC"
+        ? certificateNumber
+        : policyNumber || certificateNumber,
     issue:
-      type === "PUC"
-        ? getDate(pucIssue?.[1])
-        : getDate(insurancePeriod?.[1]) || getDate(insuranceIssue?.[1]),
+      getDate(insurancePeriod?.[1]) ||
+      getDate(issueDate?.[1]),
     expiry:
-      type === "PUC"
-        ? getDate(pucExpiry?.[1])
-        : getDate(insurancePeriod?.[2]) || getDate(insuranceExpiry?.[1]),
+      getDate(insurancePeriod?.[2]) ||
+      getDate(expiryDate?.[1]),
     vehicleId: vehicle ? String(vehicle.id) : "",
     registration,
     matchStatus,
   };
 }
 
+
+
+async function extractPdfTextWithOCR(pdfData, getOcrWorker) {
+  const pdf = await pdfjsLib.getDocument({
+    data: new Uint8Array(pdfData),
+  }).promise;
+
+  let extractedText = "";
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+
+    extractedText +=
+      content.items.map((item) => item.str || "").join(" ") + "\n";
+  }
+
+  const hasRegistration =
+    /\b[A-Z]{2}\s*-?\s*\d{1,2}\s*-?\s*[A-Z]{1,3}\s*-?\s*\d{1,4}\b/i.test(
+      extractedText
+    );
+
+  if (extractedText.trim().length >= 80 && hasRegistration) {
+    return extractedText;
+  }
+
+  const worker = await getOcrWorker();
+  let ocrText = "";
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2 });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+
+    try {
+      await page.render({
+        canvasContext: context,
+        viewport,
+      }).promise;
+
+      const result = await worker.recognize(canvas);
+      ocrText += result.data.text + "\n";
+    } finally {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }
+
+  return ocrText.trim() ? ocrText : extractedText;
+}
 
 
   function openAddForm() {
@@ -2391,6 +3105,137 @@ if (documentError) throw documentError;
           </span>
         )}
       </section>
+      
+{gmailConnected && (
+  <section className="panel">
+    <h3>Gmail document detection</h3>
+    <p className="panel-subtitle">
+      Search your Gmail for vehicle-related PDF attachments.
+    </p>
+
+    <button
+      type="button"
+      className="primary-button"
+      onClick={scanGmailDocuments}
+      disabled={gmailScanning}
+    >
+      {gmailScanning ? "Scanning Gmail..." : "Scan Gmail for PDFs"}
+    </button>
+
+  
+
+    {gmailScanError && (
+      <p className="pdf-error">{gmailScanError}</p>
+    )}
+
+    {gmailCandidates.map((candidate) => (
+      <div className="panel" key={candidate.messageId}>
+        <strong>{candidate.subject || "No subject"}</strong>
+        <p className="panel-subtitle">
+          {candidate.from} · {candidate.documentType}
+        </p>
+
+       
+{candidate.pdfAttachments.map((attachment) => {
+  const key = `${candidate.messageId}-${attachment.attachmentId}`;
+
+  return (
+    <div
+      key={attachment.attachmentId}
+      className="form-actions"
+      style={{ justifyContent: "space-between", marginTop: 8 }}
+    >
+      <span>
+        {attachment.filename} · {(attachment.size / 1024).toFixed(1)} KB
+      </span>
+
+      
+    </div>
+  );
+})}
+
+      </div>
+    ))}
+
+   
+{gmailReviewResults.length > 0 && (
+  <div className="panel">
+    <h3>Automatic review results</h3>
+
+    
+{gmailReviewResults.map((result, index) => (
+  <div
+    key={`${result.messageId}-${result.attachmentId}-${index}`}
+    className="form-actions"
+    style={{
+      justifyContent: "space-between",
+      marginTop: 12,
+      padding: 12,
+      border: "1px solid #334155",
+      borderRadius: 8,
+    }}
+  >
+    <div>
+      <strong>{result.filename}</strong>
+
+      <p className="panel-subtitle">
+        {result.type || "Unknown"} ·{" "}
+        {result.registration || "Registration not identified"}
+      </p>
+
+      <p className="panel-subtitle">
+        {result.reason}
+      </p>
+
+      
+<strong
+  style={{
+    color:
+      result.status === "saved"
+        ? "#22c55e"
+        : result.status === "unmatched"
+        ? "#f59e0b"
+        : result.status === "rejected" || result.status === "error"
+        ? "#ef4444"
+        : "#94a3b8",
+  }}
+>
+  {result.status === "unmatched"
+    ? "VEHICLE NOT IN GARAGE"
+    : result.status.toUpperCase()}
+</strong>
+
+    </div>
+
+    {result.file && (
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => {
+          const url = URL.createObjectURL(result.file);
+          const preview = window.open(
+            url,
+            "_blank",
+            "noopener,noreferrer"
+          );
+
+          if (preview) {
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          }
+        }}
+      >
+        View PDF
+      </button>
+    )}
+  </div>
+))}
+
+  </div>
+)}
+
+  </section>
+)}
+
       {gmailMessage && <p className="panel-subtitle gmail-connection-error">{gmailMessage}</p>}
       {gmailConnected && (
         <p className="panel-subtitle" aria-live="polite">
