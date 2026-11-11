@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="570" viewBox="0 0 1200 570" role="img" aria-label="MyGarage tech stack: languages, frontend and mobile, backend and database, integrations, hosting and dev tooling">
+<rect x="0.5" y="0.5" width="1199" height="149" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="22" y="34" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">LANGUAGES</text>
+<text x="22" y="64" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">What it&#8217;s written in</text>
+<rect x="22" y="84" width="178" height="34" rx="17" fill="#111827" stroke="#F7DF1E" stroke-opacity="0.55"/>
+<circle cx="40" cy="101" r="5" fill="#F7DF1E"/>
+<text x="54" y="106" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">JavaScript (JSX)</text>
+<rect x="210" y="84" width="128" height="34" rx="17" fill="#111827" stroke="#3178C6" stroke-opacity="0.55"/>
+<circle cx="228" cy="101" r="5" fill="#3178C6"/>
+<text x="242" y="106" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">TypeScript</text>
+<rect x="348" y="84" width="77" height="34" rx="17" fill="#111827" stroke="#E34F26" stroke-opacity="0.55"/>
+<circle cx="366" cy="101" r="5" fill="#E34F26"/>
+<text x="380" y="106" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">HTML</text>
+<rect x="435" y="84" width="69" height="34" rx="17" fill="#111827" stroke="#38BDF8" stroke-opacity="0.55"/>
+<circle cx="453" cy="101" r="5" fill="#38BDF8"/>
+<text x="467" y="106" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">CSS</text>
+<rect x="0.5" y="166.5" width="699" height="193" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="22" y="200" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">FRONTEND &amp; MOBILE</text>
+<text x="22" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">One React codebase, two platforms</text>
+<rect x="22" y="250" width="111" height="34" rx="17" fill="#111827" stroke="#61DAFB" stroke-opacity="0.55"/>
+<circle cx="40" cy="267" r="5" fill="#61DAFB"/>
+<text x="54" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">React 19</text>
+<rect x="143" y="250" width="94" height="34" rx="17" fill="#111827" stroke="#A78BFA" stroke-opacity="0.55"/>
+<circle cx="161" cy="267" r="5" fill="#A78BFA"/>
+<text x="175" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Vite 8</text>
+<rect x="247" y="250" width="136" height="34" rx="17" fill="#111827" stroke="#119EFF" stroke-opacity="0.55"/>
+<circle cx="265" cy="267" r="5" fill="#119EFF"/>
+<text x="279" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Capacitor 8</text>
+<rect x="393" y="250" width="102" height="34" rx="17" fill="#111827" stroke="#3DDC84" stroke-opacity="0.55"/>
+<circle cx="411" cy="267" r="5" fill="#3DDC84"/>
+<text x="425" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Android</text>
+<rect x="716.5" y="166.5" width="483" height="193" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="738" y="200" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">BACKEND &amp; DATABASE</text>
+<text x="738" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">Supabase end to end</text>
+<rect x="738" y="250" width="111" height="34" rx="17" fill="#111827" stroke="#3FCF8E" stroke-opacity="0.55"/>
+<circle cx="756" cy="267" r="5" fill="#3FCF8E"/>
+<text x="770" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Supabase</text>
+<rect x="859" y="250" width="77" height="34" rx="17" fill="#111827" stroke="#3FCF8E" stroke-opacity="0.55"/>
+<circle cx="877" cy="267" r="5" fill="#3FCF8E"/>
+<text x="891" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Auth</text>
+<rect x="946" y="250" width="128" height="34" rx="17" fill="#111827" stroke="#4EA8DE" stroke-opacity="0.55"/>
+<circle cx="964" cy="267" r="5" fill="#4EA8DE"/>
+<text x="978" y="272" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">PostgreSQL</text>
+<rect x="738" y="294" width="102" height="34" rx="17" fill="#111827" stroke="#3FCF8E" stroke-opacity="0.55"/>
+<circle cx="756" cy="311" r="5" fill="#3FCF8E"/>
+<text x="770" y="316" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Storage</text>
+<rect x="850" y="294" width="220" height="34" rx="17" fill="#111827" stroke="#E2E8F0" stroke-opacity="0.55"/>
+<circle cx="868" cy="311" r="5" fill="#E2E8F0"/>
+<text x="882" y="316" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Edge Functions (Deno)</text>
+<rect x="0.5" y="376.5" width="388" height="193" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="22" y="410" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">INTEGRATIONS</text>
+<text x="22" y="440" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">Gmail + documents</text>
+<rect x="22" y="460" width="119" height="34" rx="17" fill="#111827" stroke="#EA4335" stroke-opacity="0.55"/>
+<circle cx="40" cy="477" r="5" fill="#EA4335"/>
+<text x="54" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Gmail API</text>
+<rect x="151" y="460" width="178" height="34" rx="17" fill="#111827" stroke="#4285F4" stroke-opacity="0.55"/>
+<circle cx="169" cy="477" r="5" fill="#4285F4"/>
+<text x="183" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Google OAuth 2.0</text>
+<rect x="22" y="504" width="94" height="34" rx="17" fill="#111827" stroke="#F59E0B" stroke-opacity="0.55"/>
+<circle cx="40" cy="521" r="5" fill="#F59E0B"/>
+<text x="54" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">PDF.js</text>
+<rect x="126" y="504" width="69" height="34" rx="17" fill="#111827" stroke="#A78BFA" stroke-opacity="0.55"/>
+<circle cx="144" cy="521" r="5" fill="#A78BFA"/>
+<text x="158" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">OCR</text>
+<rect x="405.5" y="376.5" width="389" height="193" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="427" y="410" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">HOSTING</text>
+<text x="427" y="440" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">Deployed on the edge</text>
+<rect x="427" y="460" width="128" height="34" rx="17" fill="#111827" stroke="#F38020" stroke-opacity="0.55"/>
+<circle cx="445" cy="477" r="5" fill="#F38020"/>
+<text x="459" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Cloudflare</text>
+<rect x="565" y="460" width="161" height="34" rx="17" fill="#111827" stroke="#3FCF8E" stroke-opacity="0.55"/>
+<circle cx="583" cy="477" r="5" fill="#3FCF8E"/>
+<text x="597" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Supabase Cloud</text>
+<rect x="811.5" y="376.5" width="388" height="193" rx="18" fill="#0B0D10" stroke="#1E293B"/>
+<text x="833" y="410" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#64748B">DEV TOOLING</text>
+<text x="833" y="440" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#F1F5F9">Everyday workflow</text>
+<rect x="833" y="460" width="102" height="34" rx="17" fill="#111827" stroke="#5FA04E" stroke-opacity="0.55"/>
+<circle cx="851" cy="477" r="5" fill="#5FA04E"/>
+<text x="865" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Node.js</text>
+<rect x="945" y="460" width="69" height="34" rx="17" fill="#111827" stroke="#CB3837" stroke-opacity="0.55"/>
+<circle cx="963" cy="477" r="5" fill="#CB3837"/>
+<text x="977" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">npm</text>
+<rect x="1024" y="460" width="94" height="34" rx="17" fill="#111827" stroke="#8080F2" stroke-opacity="0.55"/>
+<circle cx="1042" cy="477" r="5" fill="#8080F2"/>
+<text x="1056" y="482" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">ESLint</text>
+<rect x="833" y="504" width="69" height="34" rx="17" fill="#111827" stroke="#F05032" stroke-opacity="0.55"/>
+<circle cx="851" cy="521" r="5" fill="#F05032"/>
+<text x="865" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">Git</text>
+<rect x="912" y="504" width="94" height="34" rx="17" fill="#111827" stroke="#E2E8F0" stroke-opacity="0.55"/>
+<circle cx="930" cy="521" r="5" fill="#E2E8F0"/>
+<text x="944" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">GitHub</text>
+<rect x="1016" y="504" width="102" height="34" rx="17" fill="#111827" stroke="#38BDF8" stroke-opacity="0.55"/>
+<circle cx="1034" cy="521" r="5" fill="#38BDF8"/>
+<text x="1048" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">VS Code</text>
+</svg>

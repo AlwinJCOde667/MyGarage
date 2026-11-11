@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-label="MyGarage architecture: user, React client, Supabase backend, Gmail API and Cloudflare hosting">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748B"/></marker></defs>
+<rect width="1200" height="560" rx="24" fill="#0B0D10"/><rect x="0.5" y="0.5" width="1199" height="559" rx="24" fill="none" stroke="#1E293B"/>
+<rect x="190" y="30" width="380" height="500" rx="20" fill="#0F172A" stroke="#1E293B"/>
+<text x="214" y="64" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#38BDF8">CLIENT APPLICATION</text>
+<rect x="640" y="30" width="300" height="500" rx="20" fill="#0F172A" stroke="#1E293B"/>
+<text x="664" y="64" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#3FCF8E">SUPABASE BACKEND</text>
+<rect x="30" y="230" width="110" height="60" rx="14" fill="#111827" stroke="#38BDF8"/>
+<text x="85.0" y="265.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">User</text>
+<rect x="30" y="400" width="110" height="60" rx="14" fill="#111827" stroke="#F38020"/>
+<text x="85.0" y="430.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Cloudflare</text>
+<text x="85.0" y="448.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#64748B">hosting</text>
+<path d="M140,260 H190" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M140,430 H190" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#ah)"/>
+<text x="165" y="422" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#64748B">hosts</text>
+<rect x="214" y="90" width="332" height="56" rx="14" fill="#111827" stroke="#38BDF8"/>
+<text x="380.0" y="123.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">React 19 + Vite</text>
+<rect x="214" y="176" width="332" height="56" rx="14" fill="#111827" stroke="#334155"/>
+<text x="380.0" y="209.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Vehicle dashboard</text>
+<rect x="214" y="262" width="332" height="56" rx="14" fill="#111827" stroke="#334155"/>
+<text x="380.0" y="295.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Document management</text>
+<rect x="214" y="348" width="332" height="56" rx="14" fill="#111827" stroke="#334155"/>
+<text x="380.0" y="381.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">PDF.js / OCR</text>
+<rect x="214" y="448" width="332" height="56" rx="14" fill="#111827" stroke="#3DDC84" stroke-dasharray="6 5"/>
+<text x="380.0" y="481.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Capacitor Android build</text>
+<path d="M380,146 V176" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M214,118 H202 V290 H214" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M380,318 V348" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M546,118 H558 V476 H546" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#ah)"/>
+<rect x="664" y="90" width="252" height="56" rx="14" fill="#111827" stroke="#3FCF8E"/>
+<text x="790.0" y="123.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Auth</text>
+<rect x="664" y="176" width="252" height="56" rx="14" fill="#111827" stroke="#4EA8DE"/>
+<text x="790.0" y="209.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">PostgreSQL</text>
+<rect x="664" y="262" width="252" height="56" rx="14" fill="#111827" stroke="#E2E8F0"/>
+<text x="790.0" y="295.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Edge Functions</text>
+<rect x="664" y="348" width="252" height="56" rx="14" fill="#111827" stroke="#3FCF8E"/>
+<text x="790.0" y="381.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Storage</text>
+<path d="M570,118 H640 M640,118 H664" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M570,204 H664" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path d="M570,290 H664" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M570,376 H664" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<rect x="980" y="262" width="190" height="56" rx="14" fill="#111827" stroke="#EA4335"/>
+<text x="1075.0" y="295.0" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Gmail API</text>
+<path d="M916,290 H980" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<text x="948" y="280" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#64748B">OAuth</text>
+</svg>
