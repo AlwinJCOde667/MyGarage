@@ -1,111 +1,128 @@
-<!--
-  MyGarage — Premium README
-  Visual direction: Minimal Midnight / Electric Blue
-  Note: Feature status is intentionally separated into implemented and planned work.
---><p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Inter&weight=500&size=19&duration=2800&pause=900&color=38BDF8&center=true&vCenter=true&width=750&lines=Every+vehicle.+One+intelligent+garage.;Documents+organized.+Ownership+simplified.;A+smarter+approach+to+vehicle+management." alt="Animated MyGarage tagline" />
-</p><p align="center">
-  <img src="https://img.shields.io/badge/STATUS-ACTIVE%20DEVELOPMENT-0EA5E9?style=for-the-badge&labelColor=080D1B" alt="Project status: Active development" />
-  <img src="https://img.shields.io/badge/PLATFORM-WEB%20%2B%20ANDROID-38BDF8?style=for-the-badge&labelColor=080D1B" alt="Web and Android" />
-  <img src="https://img.shields.io/badge/BACKEND-SUPABASE-3FCF8E?style=for-the-badge&labelColor=080D1B" alt="Supabase backend" />
-</p><p align="center">
-  <strong>One place to manage vehicles, organize documents and simplify the responsibilities of ownership.</strong>
-</p>◈ Overview
-MyGarage is a multi-vehicle management application designed to bring vehicle information and important ownership documents into one connected workspace.
+<div align="center">
 
-The project combines a React application with Supabase services, Gmail integration and document-processing workflows. It is being developed for web use, with an Android build produced through Capacitor.
+# 🚘 MyGarage
 
-The goal is straightforward: reduce scattered records and make it easier to keep track of the information that matters for every vehicle.
-▣ The bento grid
+### Every vehicle. One intelligent garage.
+
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=500&size=19&duration=2800&pause=900&color=38BDF8&center=true&vCenter=true&width=750&lines=Documents+organized.+Ownership+simplified.;Gmail+%E2%86%92+PDF+%E2%86%92+Smart+classification.;One+React+codebase.+Web+%2B+Android." alt="Animated tagline" />
+
+<br />
+
+<img src="https://img.shields.io/badge/STATUS-ACTIVE%20DEVELOPMENT-0EA5E9?style=for-the-badge&labelColor=080D1B" alt="Status" />
+<img src="https://img.shields.io/badge/PLATFORM-WEB%20%2B%20ANDROID-38BDF8?style=for-the-badge&labelColor=080D1B" alt="Platform" />
+<img src="https://img.shields.io/badge/BACKEND-SUPABASE-3FCF8E?style=for-the-badge&labelColor=080D1B" alt="Backend" />
+<img src="https://img.shields.io/badge/HOSTED%20ON-CLOUDFLARE-F38020?style=for-the-badge&labelColor=080D1B" alt="Cloudflare" />
+
+<br /><br />
+
+**One place to manage vehicles, organize documents and simplify the responsibilities of ownership.**
+
+</div>
+
+<br />
+
+## ✦ About
+
+MyGarage is a multi-vehicle management app that brings vehicle details and ownership documents into one connected workspace. It pairs a **React** frontend with **Supabase** services, a **Gmail** integration and a **PDF-processing** pipeline, and ships as a website plus an **Android** app through **Capacitor**.
+
+The goal is simple: fewer scattered records, and an easier way to keep track of what matters for every vehicle you own.
+
+<br />
+
+## ✦ Features at a glance
+
 <table>
   <tr>
-    <td colspan="2" width="66%" valign="top">🚘 01 / Multi-vehicle garage
-Manage multiple vehicles from a centralized dashboard. Vehicle records are associated with the user's garage rather than being tied to a single hardcoded vehicle.
-</td>
-<td width="34%" valign="top">
-☁️ 02 / Cloud foundation
-Supabase provides authentication and the hosted database foundation for the application.
-</td>
-
+    <td colspan="2" width="60%" valign="top">
+      <h3>🚘 Multi-vehicle garage</h3>
+      <p>A central dashboard for every vehicle you own. Records belong to the <b>user's garage</b>, not to a single hardcoded vehicle.</p>
+      <img src="https://img.shields.io/badge/-Dashboard-0EA5E9?style=flat-square&labelColor=080D1B" />
+      <img src="https://img.shields.io/badge/-Multi--vehicle-0EA5E9?style=flat-square&labelColor=080D1B" />
+    </td>
+    <td width="40%" valign="top">
+      <h3>☁️ Cloud foundation</h3>
+      <p>Supabase Auth and a hosted PostgreSQL database power sign-in and storage.</p>
+      <img src="https://img.shields.io/badge/-Auth-3FCF8E?style=flat-square&labelColor=080D1B" />
+      <img src="https://img.shields.io/badge/-PostgreSQL-3FCF8E?style=flat-square&labelColor=080D1B" />
+    </td>
   </tr>
   <tr>
-    <td width="33%" valign="top">📄 03 / Document management
-- Document categorization
-- Vehicle matching
-- Duplicate detection
-- Document version history
+    <td width="33%" valign="top">
+      <h3>📄 Documents</h3>
+      <ul>
+        <li>Categorization</li>
+        <li>Vehicle matching</li>
+        <li>Duplicate detection</li>
+        <li>Version history</li>
+      </ul>
     </td>
     <td width="33%" valign="top">
-📧 04 / Gmail workflow
-Connect Gmail and discover PDF attachments that may contain vehicle-related documents. Attachments can be reviewed and processed through the document workflow.
-</td>
-<td width="34%" valign="top">
-🔎 05 / PDF processing
-Extract text from supported PDFs and use the extracted information to assist document classification and vehicle matching. OCR-assisted extraction is part of the processing workflow.
-</td>
-
+      <h3>📧 Gmail workflow</h3>
+      <p>Connect Gmail with your permission, discover PDF attachments that may be vehicle documents, then review and process them.</p>
+    </td>
+    <td width="34%" valign="top">
+      <h3>🔎 PDF processing</h3>
+      <p>Text extraction from supported PDFs, with an OCR fallback for scanned files, to help classify documents and match vehicles.</p>
+    </td>
   </tr>
   <tr>
-    <td colspan="3" valign="top">📱 06 / Web and Android
-The application is built with React and Vite. Capacitor is used to package the web application for Android; an Android APK has been generated and tested.
-</td>
-
+    <td width="40%" valign="top">
+      <h3>📱 Web + Android</h3>
+      <p>Built with React and Vite. Capacitor packages it for Android, and an APK has been <b>generated and tested</b>.</p>
+    </td>
+    <td colspan="2" width="60%" valign="top">
+      <h3>🔐 Secure by design</h3>
+      <p>Gmail access needs explicit user authorization. OAuth credentials and protected operations are handled server-side through <b>Supabase Edge Functions</b>, never in the client.</p>
+    </td>
   </tr>
-</table>⚡ Technology stack
-Application
-<p>
-  <img src="https://skillicons.dev/icons?i=react,vite,js,css,html&theme=dark" alt="React, Vite, JavaScript, CSS and HTML" />
-</p>Technology	Role
-JavaScript	Main application language
-JSX	React component syntax
-React 19	Component-based user interface
-Vite 8	Development server and build tooling
-CSS	Application styling
+</table>
 
+<br />
 
-Backend and cloud
-<p>
-  <img src="https://skillicons.dev/icons?i=supabase,postgres,cloudflare&theme=dark" alt="Supabase, PostgreSQL and Cloudflare" />
-</p>Technology	Role
-Supabase	Backend platform
-Supabase Auth	User authentication
-PostgreSQL	Relational database
-Supabase Edge Functions	Server-side integration and protected operations
-Supabase Storage	Cloud file storage
-Cloudflare	Web deployment and hosting
+## ✦ Tech stack
 
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎨 Frontend</h3>
+      <img src="https://skillicons.dev/icons?i=react,vite,js,html,css&theme=dark" alt="Frontend icons" />
+      <br /><br />
+      <b>React 19</b> · <b>Vite 8</b> · <b>JavaScript (JSX)</b> · <b>CSS</b>
+    </td>
+    <td width="50%" valign="top">
+      <h3>⚙️ Backend & cloud</h3>
+      <img src="https://skillicons.dev/icons?i=supabase,postgres,cloudflare,deno,ts&theme=dark" alt="Backend icons" />
+      <br /><br />
+      <b>Supabase</b> (Auth, Storage, Edge Functions) · <b>PostgreSQL</b> · <b>Cloudflare</b> · <b>Deno / TypeScript</b>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🔌 Integrations</h3>
+      <b>Gmail API</b> · <b>Google OAuth 2.0</b> · <b>PDF.js</b> · <b>OCR processing</b>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🛠 Mobile & tooling</h3>
+      <img src="https://skillicons.dev/icons?i=android,nodejs,git,github,vscode&theme=dark" alt="Tooling icons" />
+      <br /><br />
+      <b>Capacitor 8</b> · <b>Node.js & npm</b> · <b>ESLint</b> · <b>Git & GitHub</b> · <b>VS Code</b>
+    </td>
+  </tr>
+</table>
 
-Document and integration layer
-Technology / service	Role
-Gmail API	Discover and retrieve Gmail attachments with user authorization
-Google OAuth 2.0	Gmail account authorization
-PDF.js	PDF text extraction and document inspection
-OCR processing	Text extraction fallback for supported scanned PDFs
-Deno / TypeScript	Runtime and language used by Supabase Edge Function code
+<br />
 
+## ✦ Architecture
 
-Mobile and developer tooling
-<p>
-  <img src="https://skillicons.dev/icons?i=android,git,github,vscode,nodejs&theme=dark" alt="Android, Git, GitHub, Visual Studio Code and Node.js" />
-</p>Tool	Role
-Capacitor 8	Native Android project and web-to-mobile packaging
-Android	Mobile build target
-Node.js and npm	JavaScript development environment and package management
-Git	Version control
-GitHub	Source-code hosting
-Visual Studio Code	Development environment
-ESLint	JavaScript code linting
-
-
-◈ System architecture
 ```mermaid
 flowchart TB
-    USER(["User"])
+    USER(["👤 User"])
+
     subgraph CLIENT["Client application"]
         UI["React 19 + Vite"]
         GARAGE["Vehicle dashboard"]
         DOCS["Document management"]
-        PDF["PDF.js / OCR processing"]
+        PDF["PDF.js / OCR"]
         MOBILE["Capacitor Android build"]
         UI --> GARAGE
         UI --> DOCS
@@ -114,14 +131,14 @@ flowchart TB
     end
 
     subgraph CLOUD["Supabase backend"]
-        AUTH["Supabase Auth"]
+        AUTH["Auth"]
         DB[("PostgreSQL")]
-        STORAGE["Supabase Storage"]
-        EDGE["Supabase Edge Functions"]
+        STORAGE["Storage"]
+        EDGE["Edge Functions"]
     end
 
     GMAIL["Gmail API"]
-    CLOUDFLARE["Cloudflare hosting"]
+    CF["Cloudflare hosting"]
 
     USER --> UI
     UI --> AUTH
@@ -129,91 +146,137 @@ flowchart TB
     UI <--> STORAGE
     DOCS --> EDGE
     EDGE <--> GMAIL
-    UI -. deployed on .-> CLOUDFLARE
+    UI -. deployed on .-> CF
 ```
-Document workflow
-1. The user connects a Gmail account through the authorization flow.
-2. MyGarage discovers PDF attachments for review.
-3. The attachment is retrieved through a protected server-side function.
-4. PDF text extraction and OCR-assisted processing are used where supported.
-5. Extracted information is evaluated for document type and vehicle association.
-6. The user can review and manage the resulting document record.
-◈ Implementation status
-The project is under active development. The checklist below distinguishes working foundations from workflows that are still being improved or planned.
+
+<br />
+
+## ✦ How the document workflow works
+
+<table>
+  <tr>
+    <td align="center" width="16%"><h3>1</h3><b>Connect</b><br />Authorize Gmail</td>
+    <td align="center" width="16%"><h3>2</h3><b>Discover</b><br />Find PDF attachments</td>
+    <td align="center" width="17%"><h3>3</h3><b>Retrieve</b><br />Via protected function</td>
+    <td align="center" width="17%"><h3>4</h3><b>Extract</b><br />PDF text + OCR</td>
+    <td align="center" width="17%"><h3>5</h3><b>Classify</b><br />Type + vehicle match</td>
+    <td align="center" width="17%"><h3>6</h3><b>Review</b><br />Manage the record</td>
+  </tr>
+</table>
+
+<br />
+
+## ✦ Progress
+
 <details open>
-<summary><strong>01 — Application foundation</strong> · COMPLETED</summary>- [x] React + Vite application
+<summary><b>01 · Application foundation</b> &nbsp;<img src="https://img.shields.io/badge/-COMPLETED-22C55E?style=flat-square&labelColor=080D1B" /></summary>
+<br />
+
+- [x] React + Vite application
 - [x] Supabase authentication
 - [x] Cloud database integration
 - [x] Multi-vehicle management
 - [x] Cloudflare deployment
 - [x] Android APK generation and testing
-</details><details open>
-<summary><strong>02 — Document management</strong> · IMPLEMENTED / BEING IMPROVED</summary>- [x] Document categorization
+
+</details>
+
+<details open>
+<summary><b>02 · Document management</b> &nbsp;<img src="https://img.shields.io/badge/-IN%20PROGRESS-F59E0B?style=flat-square&labelColor=080D1B" /></summary>
+<br />
+
+- [x] Document categorization
 - [x] Vehicle matching
 - [x] Duplicate detection
 - [x] Document version history
 - [x] Gmail account integration
-- [x] PDF attachment discovery and retrieval workflow
-- [x] PDF text extraction workflow
-- [ ] Improve reliability across different PDF formats and attachment sizes
+- [x] PDF attachment discovery and retrieval
+- [x] PDF text extraction
+- [ ] Improve reliability across PDF formats and attachment sizes
 - [ ] Complete and harden automated document processing
 - [ ] Improve extraction and classification accuracy
-</details><details>
-<summary><strong>03 — Ownership automation</strong> · PLANNED</summary>- [ ] Automated document-expiry notifications
-- [ ] Proactive insurance and PUC renewal reminders
+
+</details>
+
+<details>
+<summary><b>03 · Ownership automation</b> &nbsp;<img src="https://img.shields.io/badge/-PLANNED-64748B?style=flat-square&labelColor=080D1B" /></summary>
+<br />
+
+- [ ] Document-expiry notifications
+- [ ] Insurance and PUC renewal reminders
 - [ ] Maintenance and service tracking
 - [ ] Next-service reminders
 - [ ] Expanded mobile experience
 - [ ] Intelligent vehicle insights
-</details>◈ Engineering focus
-MyGarage is being developed around a few practical engineering priorities:
-- Multi-vehicle data handling: features should work across a user's garage, not rely on hardcoded vehicle records.
-- Document reliability: PDFs can vary in structure, quality and readability, so extraction and classification need validation and graceful failure handling.
-- Secure integrations: Gmail access requires explicit user authorization and protected handling of OAuth credentials.
-- Incremental delivery: the application separates completed foundations from workflows that still need reliability improvements.
-- Web-to-mobile delivery: the React application can be packaged for Android through Capacitor.
-◈ Roadmap
-Area	Next focus
-Document intelligence	Improve extraction, classification and vehicle matching
-Renewal management	Expiry dates, reminders and notification delivery
-Maintenance	Service history, costs and next-service tracking
-Mobile	Improve the Android experience
-Insights	Useful summaries across the user's vehicles
 
+</details>
 
-◈ Local development
-Prerequisites
-- Node.js and npm
-- A Supabase project with the required environment configuration
-- Git
-Run the application
+<br />
+
+## ✦ Roadmap
+
+<table>
+  <tr>
+    <td width="20%" valign="top"><h3>🧠</h3><b>Document intelligence</b><br />Better extraction, classification and vehicle matching</td>
+    <td width="20%" valign="top"><h3>🔔</h3><b>Renewals</b><br />Expiry dates, reminders and notification delivery</td>
+    <td width="20%" valign="top"><h3>🔧</h3><b>Maintenance</b><br />Service history, costs and next-service tracking</td>
+    <td width="20%" valign="top"><h3>📱</h3><b>Mobile</b><br />A smoother Android experience</td>
+    <td width="20%" valign="top"><h3>📊</h3><b>Insights</b><br />Useful summaries across all your vehicles</td>
+  </tr>
+</table>
+
+<br />
+
+## ✦ Engineering principles
+
+- **Multi-vehicle first:** features work across a user's whole garage.
+- **Reliable documents:** PDFs vary in quality, so extraction is validated and fails gracefully.
+- **Secure integrations:** explicit user consent for Gmail, and protected handling of OAuth credentials.
+- **Incremental delivery:** finished foundations are clearly separated from work in progress.
+- **One codebase:** the React app is packaged for Android through Capacitor.
+
+<br />
+
+## ✦ Run it locally
+
+**Prerequisites:** Node.js and npm, Git, and a Supabase project with the required environment configuration.
+
+```bash
 # Clone the repository
 git clone https://github.com/AlwinJCOde667/MyGarage.git
-
-# Enter the project
 cd MyGarage
 
-# Install dependencies
+# Install dependencies and start the dev server
 npm install
-
-# Start the development server
 npm run dev
-Available scripts
-npm run dev      # Start Vite development server
-npm run build    # Create a production build
-npm run preview  # Preview the production build
-npm run lint     # Run ESLint
-Configure the required Supabase and Google OAuth settings before using authenticated and Gmail-connected features. Never commit API secrets, service-role keys, OAuth client secrets or private environment files.
+```
 
-◈ Built by
-<p align="center">
-  <strong>Alwin John Shajan</strong>
-  <br />
-  Computer Science & Engineering
-  <br /><br />
-  <a href="https://github.com/AlwinJCOde667">
-    <img src="https://img.shields.io/badge/GitHub-AlwinJCOde667-FFFFFF?style=for-the-badge&logo=github&logoColor=000000" alt="GitHub profile" />
-  </a>
-</p><p align="center">
-  <em>Designed around a simple idea: vehicle ownership should be easier to manage.</em>
-</p>
+| Script | What it does |
+|---|---|
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Create a production build |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+
+> [!WARNING]
+> Configure your Supabase and Google OAuth settings before using authenticated and Gmail-connected features. Never commit API secrets, service-role keys, OAuth client secrets or private environment files.
+
+<br />
+
+<div align="center">
+
+## ✦ Built by
+
+**Alwin John Shajan**
+<br />
+Computer Science & Engineering
+
+<a href="https://github.com/AlwinJCOde667">
+  <img src="https://img.shields.io/badge/GitHub-AlwinJCOde667-FFFFFF?style=for-the-badge&logo=github&logoColor=000000" alt="GitHub profile" />
+</a>
+
+<br /><br />
+
+<em>Designed around a simple idea: vehicle ownership should be easier to manage.</em>
+
+</div>
