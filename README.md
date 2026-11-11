@@ -1,17 +1,24 @@
 <div align="center">
 
-# 🚘 MyGarage
-
-### Every vehicle. One intelligent garage.
-
-<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=500&size=19&duration=2800&pause=900&color=38BDF8&center=true&vCenter=true&width=750&lines=Documents+organized.+Ownership+simplified.;Gmail+%E2%86%92+PDF+%E2%86%92+Smart+classification.;One+React+codebase.+Web+%2B+Android." alt="Animated tagline" />
+<img src="./assets/hero.svg" alt="MyGarage. Every vehicle. One intelligent garage." width="100%" />
 
 <br />
 
-<img src="https://img.shields.io/badge/STATUS-ACTIVE%20DEVELOPMENT-0EA5E9?style=for-the-badge&labelColor=080D1B" alt="Status" />
-<img src="https://img.shields.io/badge/PLATFORM-WEB%20%2B%20ANDROID-38BDF8?style=for-the-badge&labelColor=080D1B" alt="Platform" />
-<img src="https://img.shields.io/badge/BACKEND-SUPABASE-3FCF8E?style=for-the-badge&labelColor=080D1B" alt="Backend" />
-<img src="https://img.shields.io/badge/HOSTED%20ON-CLOUDFLARE-F38020?style=for-the-badge&labelColor=080D1B" alt="Cloudflare" />
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=500&size=18&duration=2800&pause=900&color=94A3B8&center=true&vCenter=true&width=750&lines=Documents+organized.+Ownership+simplified.;Gmail+%E2%86%92+PDF+%E2%86%92+Smart+classification.;One+React+codebase.+Web+%2B+Android." alt="Animated tagline" />
+
+<br />
+
+<a href="#-features-at-a-glance"><img src="https://img.shields.io/badge/Explore_features-0EA5E9?style=for-the-badge&logo=rocket&logoColor=white" alt="Explore features" /></a>
+&nbsp;
+<a href="https://github.com/AlwinJCOde667/MyGarage"><img src="https://img.shields.io/badge/View_source-0B0D10?style=for-the-badge&logo=github&logoColor=white&labelColor=0B0D10&color=1E293B" alt="View source" /></a>
+
+<br /><br />
+
+<img src="https://img.shields.io/badge/React_19-0B0D10?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
+<img src="https://img.shields.io/badge/Vite_8-0B0D10?style=flat-square&logo=vite&logoColor=A78BFA" alt="Vite" />
+<img src="https://img.shields.io/badge/Supabase-0B0D10?style=flat-square&logo=supabase&logoColor=3FCF8E" alt="Supabase" />
+<img src="https://img.shields.io/badge/Capacitor_8-0B0D10?style=flat-square&logo=capacitor&logoColor=119EFF" alt="Capacitor" />
+<img src="https://img.shields.io/badge/Cloudflare-0B0D10?style=flat-square&logo=cloudflare&logoColor=F38020" alt="Cloudflare" />
 
 <br /><br />
 
