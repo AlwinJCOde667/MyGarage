@@ -95,67 +95,61 @@
 
 <table>
   <tr>
-    <td width="33%" valign="top">
-      <b>Languages</b>
-      <ul>
-        <li>JavaScript (JSX)</li>
-        <li>TypeScript</li>
-        <li>HTML</li>
-        <li>CSS</li>
-      </ul>
+    <td colspan="2" width="60%" valign="top">
+      <sub><b>FRONTEND &amp; MOBILE</b></sub>
+      <h3>One React codebase, two platforms</h3>
+      <img src="https://skillicons.dev/icons?i=react,vite,js,html,css,android&theme=dark" alt="Frontend icons" />
+      <br /><br />
+      <img src="https://img.shields.io/badge/React_19-0F172A?style=flat-square&logo=react&logoColor=61DAFB" alt="React 19" />
+      <img src="https://img.shields.io/badge/Vite_8-0F172A?style=flat-square&logo=vite&logoColor=A78BFA" alt="Vite 8" />
+      <img src="https://img.shields.io/badge/Capacitor_8-0F172A?style=flat-square&logo=capacitor&logoColor=119EFF" alt="Capacitor 8" />
+      <img src="https://img.shields.io/badge/JavaScript_(JSX)-0F172A?style=flat-square&logo=javascript&logoColor=F7DF1E" alt="JavaScript" />
+      <img src="https://img.shields.io/badge/CSS3-0F172A?style=flat-square&logo=css3&logoColor=38BDF8" alt="CSS3" />
+      <img src="https://img.shields.io/badge/Android-0F172A?style=flat-square&logo=android&logoColor=3DDC84" alt="Android" />
     </td>
-    <td width="33%" valign="top">
-      <b>Frontend & Mobile</b>
-      <ul>
-        <li>React 19</li>
-        <li>Vite 8</li>
-        <li>Capacitor 8</li>
-        <li>Android</li>
-      </ul>
-    </td>
-    <td width="34%" valign="top">
-      <b>Backend & Databases</b>
-      <ul>
-        <li>Supabase</li>
-        <li>Supabase Auth</li>
-        <li>PostgreSQL</li>
-        <li>Supabase Storage</li>
-        <li>Supabase Edge Functions (Deno)</li>
-      </ul>
+    <td width="40%" valign="top">
+      <sub><b>BACKEND &amp; DATABASE</b></sub>
+      <h3>Supabase end to end</h3>
+      <img src="https://skillicons.dev/icons?i=supabase,postgres,deno,ts&theme=dark" alt="Backend icons" />
+      <br /><br />
+      <img src="https://img.shields.io/badge/Supabase-0F172A?style=flat-square&logo=supabase&logoColor=3FCF8E" alt="Supabase" />
+      <img src="https://img.shields.io/badge/Auth-0F172A?style=flat-square&logo=supabase&logoColor=3FCF8E" alt="Supabase Auth" />
+      <img src="https://img.shields.io/badge/PostgreSQL-0F172A?style=flat-square&logo=postgresql&logoColor=4EA8DE" alt="PostgreSQL" />
+      <img src="https://img.shields.io/badge/Storage-0F172A?style=flat-square&logo=supabase&logoColor=3FCF8E" alt="Supabase Storage" />
+      <img src="https://img.shields.io/badge/Edge_Functions-0F172A?style=flat-square&logo=deno&logoColor=white" alt="Edge Functions" />
+      <img src="https://img.shields.io/badge/TypeScript-0F172A?style=flat-square&logo=typescript&logoColor=3178C6" alt="TypeScript" />
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
-      <b>Integrations</b>
-      <ul>
-        <li>Gmail API</li>
-        <li>Google OAuth 2.0</li>
-        <li>PDF.js</li>
-        <li>OCR processing</li>
-      </ul>
+      <sub><b>INTEGRATIONS</b></sub>
+      <h3>Gmail + documents</h3>
+      <img src="https://img.shields.io/badge/Gmail_API-0F172A?style=flat-square&logo=gmail&logoColor=EA4335" alt="Gmail API" />
+      <img src="https://img.shields.io/badge/Google_OAuth_2.0-0F172A?style=flat-square&logo=google&logoColor=white" alt="Google OAuth 2.0" />
+      <img src="https://img.shields.io/badge/PDF.js-0F172A?style=flat-square&logoColor=white" alt="PDF.js" />
+      <img src="https://img.shields.io/badge/OCR-0F172A?style=flat-square&logoColor=white" alt="OCR" />
     </td>
     <td width="33%" valign="top">
-      <b>Cloud & Hosting</b>
-      <ul>
-        <li>Cloudflare</li>
-        <li>Supabase Cloud</li>
-      </ul>
+      <sub><b>HOSTING</b></sub>
+      <h3>Deployed on the edge</h3>
+      <img src="https://skillicons.dev/icons?i=cloudflare&theme=dark" alt="Cloudflare" />
+      <br /><br />
+      <img src="https://img.shields.io/badge/Cloudflare-0F172A?style=flat-square&logo=cloudflare&logoColor=F38020" alt="Cloudflare" />
+      <img src="https://img.shields.io/badge/Supabase_Cloud-0F172A?style=flat-square&logo=supabase&logoColor=3FCF8E" alt="Supabase Cloud" />
     </td>
     <td width="34%" valign="top">
-      <b>Tools</b>
-      <ul>
-        <li>Node.js & npm</li>
-        <li>Git & GitHub</li>
-        <li>ESLint</li>
-        <li>VS Code</li>
-      </ul>
+      <sub><b>DEV TOOLING</b></sub>
+      <h3>Everyday workflow</h3>
+      <img src="https://skillicons.dev/icons?i=nodejs,git,github,vscode&theme=dark" alt="Tooling icons" />
+      <br /><br />
+      <img src="https://img.shields.io/badge/Node.js-0F172A?style=flat-square&logo=nodedotjs&logoColor=5FA04E" alt="Node.js" />
+      <img src="https://img.shields.io/badge/npm-0F172A?style=flat-square&logo=npm&logoColor=CB3837" alt="npm" />
+      <img src="https://img.shields.io/badge/ESLint-0F172A?style=flat-square&logo=eslint&logoColor=8080F2" alt="ESLint" />
+      <img src="https://img.shields.io/badge/Git-0F172A?style=flat-square&logo=git&logoColor=F05032" alt="Git" />
+      <img src="https://img.shields.io/badge/GitHub-0F172A?style=flat-square&logo=github&logoColor=white" alt="GitHub" />
     </td>
   </tr>
 </table>
-
-<p align="center">
-  <img src="https://skillicons.dev/icons?i=react,vite,js,ts,html,css,supabase,postgres,cloudflare,deno,android,nodejs,git,github,vscode&theme=dark" alt="Tech stack icons" />
-</p>
 
 ---
 
